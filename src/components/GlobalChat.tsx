@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { useWallet } from '../contexts/WalletContext';
+import { styledButton, styledDiv, WithIsOpen } from '../utils/styled-components-fix';
 
 // Types
 interface ChatMessage {
@@ -22,7 +23,7 @@ interface ChatContainerProps {
   isOpen: boolean;
 }
 
-const ChatContainer = styled.div<ChatContainerProps>`
+const ChatContainer = styledDiv.withIsOpen`
   position: fixed;
   right: ${props => props.isOpen ? '0' : '-360px'};
   top: 0;
@@ -93,10 +94,8 @@ interface ToggleButtonProps {
   isOpen: boolean;
 }
 
-// Create a button element that accepts the isOpen prop
-const ChatToggleButton = styled.button.withConfig({
-  shouldForwardProp: (prop) => prop !== 'isOpen',
-})<ToggleButtonProps>`
+// Replace the ChatToggleButton with the utility version
+const ChatToggleButton = styledButton.withIsOpen`
   position: fixed;
   right: ${props => props.isOpen ? '360px' : '0'};
   top: 50%;
