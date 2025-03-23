@@ -88,7 +88,15 @@ const CloseButton = styled.button`
   }
 `;
 
-const ChatToggleButton = styled.button<{ isOpen: boolean }>`
+// Define a proper interface for the button props
+interface ToggleButtonProps {
+  isOpen: boolean;
+}
+
+// Create a button element that accepts the isOpen prop
+const ChatToggleButton = styled.button.withConfig({
+  shouldForwardProp: (prop) => prop !== 'isOpen',
+})<ToggleButtonProps>`
   position: fixed;
   right: ${props => props.isOpen ? '360px' : '0'};
   top: 50%;

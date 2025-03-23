@@ -4,7 +4,12 @@ const nextConfig = {
   compiler: {
     // Configure styledComponents to improve developer experience with better debugging
     styledComponents: {
-      shouldForwardProp: (prop) => !['isOpen', 'active', 'collapsed', 'isActive', 'isSelected', 'isWin', 'hasMine', 'revealed', 'isAnimating', 'success', 'red'].includes(prop),
+      // Exclude all common props that we use in styled components
+      shouldForwardProp: (prop) => ![
+        'isOpen', 'active', 'collapsed', 'isActive', 'isSelected', 'isWin', 
+        'hasMine', 'revealed', 'isAnimating', 'success', 'red', 'isOnline',
+        'isMine', 'isSystem'
+      ].includes(prop),
     },
   },
   webpack: (config, { isServer, dev }) => {

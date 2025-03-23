@@ -602,7 +602,9 @@ interface SidebarProps {
   collapsed: boolean;
 }
 
-const MainContent = styled.div<SidebarProps>`
+const MainContent = styled.div.withConfig({
+  shouldForwardProp: (prop) => prop !== 'collapsed',
+})<SidebarProps>`
   margin-left: ${props => props.collapsed ? '60px' : '200px'};
   padding: 20px;
   transition: margin-left 0.3s ease-in-out;

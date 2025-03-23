@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "clean-build": "rimraf .next && next build",
     "start": "next start",
     "lint": "next lint",
     "fix-styled": "node scripts/fix-styled-components.js",
@@ -30,6 +31,7 @@
     "@types/styled-components": "^5.1.34",
     "eslint": "^8.52.0",
     "eslint-config-next": "^14.0.1",
+    "rimraf": "^6.0.1",
     "typescript": "^5.2.2"
   }
 }
