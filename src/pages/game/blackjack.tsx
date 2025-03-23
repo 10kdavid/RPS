@@ -9,7 +9,8 @@ import {
   createGameSession, 
   joinGameSession, 
   listenToGameUpdates, 
-  updateGameState 
+  updateGameState,
+  checkGameExists
 } from '../../utils/firebase';
 
 // Game constants and types
@@ -653,16 +654,36 @@ const BlackjackGame: React.FC = () => {
   const [unsubscribeRef, setUnsubscribeRef] = useState<any>(null);
   const [gameSessionId, setGameSessionId] = useState<string | null>(null);
   
-  // Check for invite code in URL when component mounts
+  // Update useEffect to properly handle invite links
   useEffect(() => {
-    const { invite } = router.query;
-    if (invite && typeof invite === 'string') {
-      setInviteCode(invite);
-      if (connected) {
-        handleJoinGame();
+    const handleInviteCode = async () => {
+      const { invite } = router.query;
+      console.log("Router query:", router.query);
+      
+      if (invite && typeof invite === 'string') {
+        console.log(`Detected invite code: ${invite}`);
+        setInviteCode(invite);
+        
+        if (connected && publicKey) {
+          console.log(`User connected with wallet ${publicKey}, attempting to join game`);
+          try {
+            await handleJoinGame(invite);
+          } catch (error) {
+            console.error("Error joining game with invite code:", error);
+            alert(`Failed to join game: ${error.message || "Unknown error"}`);
+          }
+        } else {
+          console.log("Wallet not connected, prompting user to connect");
+          alert("Please connect your wallet to join this game");
+          openWalletModal();
+        }
       }
+    };
+    
+    if (router.isReady) {
+      handleInviteCode();
     }
-  }, [router.query, connected]);
+  }, [router.isReady, router.query, connected, publicKey]);
   
   // Cleanup Firebase listeners when component unmounts
   useEffect(() => {
@@ -793,8 +814,10 @@ const BlackjackGame: React.FC = () => {
   };
   
   // Function to handle joining a game with invite code
-  const handleJoinGame = async () => {
-    if (!inviteCode) {
+  const handleJoinGame = async (codeToUse?: string) => {
+    const finalInviteCode = codeToUse || inviteCode;
+    
+    if (!finalInviteCode) {
       alert('Please enter an invite code.');
       return;
     }
@@ -805,21 +828,24 @@ const BlackjackGame: React.FC = () => {
       return;
     }
     
+    console.log(`Attempting to join game with code: ${finalInviteCode}`);
     setConnectionState(ConnectionState.CONNECTING);
     
     try {
-      // Join the game in Firebase
-      const success = await joinGameSession('blackjack', inviteCode, publicKey.toString());
-      
-      if (!success) {
-        throw new Error('Failed to join game. It may no longer be available.');
+      // Check if game exists first
+      const exists = await checkGameExists('blackjack', finalInviteCode);
+      if (!exists) {
+        throw new Error("Game not found or has expired");
       }
       
-      setGameSessionId(inviteCode);
+      // Join the game in Firebase
+      await joinGameSession('blackjack', finalInviteCode, publicKey.toString());
+      
+      setGameSessionId(finalInviteCode);
       
       // Listen for game updates
-      const unsubscribe = listenToGameUpdates('blackjack', inviteCode, (gameData) => {
-        console.log('Game update:', gameData);
+      const unsubscribe = listenToGameUpdates('blackjack', finalInviteCode, (gameData) => {
+        console.log('Game update received:', gameData);
         
         // Update game state based on creator's actions
         if (gameData.status === 'playing') {
@@ -850,11 +876,13 @@ const BlackjackGame: React.FC = () => {
       });
       
       setUnsubscribeRef(() => unsubscribe);
+      console.log("Successfully joined game and established connection");
       
     } catch (error) {
-      console.error('Error joining game:', error);
+      console.error("Error joining game:", error);
       alert(error.message || 'Failed to join game. Please try again.');
       setConnectionState(ConnectionState.DISCONNECTED);
+      throw error;
     }
   };
   

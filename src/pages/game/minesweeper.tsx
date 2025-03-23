@@ -10,7 +10,8 @@ import {
   createGameSession, 
   joinGameSession, 
   listenToGameUpdates, 
-  updateGameState 
+  updateGameState,
+  checkGameExists
 } from '../../utils/firebase';
 
 // Game States & Types
@@ -785,17 +786,22 @@ const MinesweeperGame: React.FC = () => {
   // Joining a game
   const joinGame = async (id: string) => {
     if (!connected || !publicKey) {
+      alert("Please connect your wallet to join this game");
       openWalletModal();
       return;
     }
     
+    console.log(`Attempting to join minesweeper game: ${id}`);
+    
     try {
-      // Join the game in Firebase
-      const success = await joinGameSession('minesweeper', id, publicKey.toString());
-      
-      if (!success) {
-        throw new Error('Failed to join game. It may no longer be available.');
+      // Check if game exists first
+      const exists = await checkGameExists('minesweeper', id);
+      if (!exists) {
+        throw new Error("Game not found or has expired");
       }
+      
+      // Join the game in Firebase
+      await joinGameSession('minesweeper', id, publicKey.toString());
       
       setHasOpponent(true);
       setOpponentName("Game Creator");
@@ -803,7 +809,7 @@ const MinesweeperGame: React.FC = () => {
       
       // Listen for game updates
       const unsubscribe = listenToGameUpdates('minesweeper', id, (gameData) => {
-        console.log('Game update:', gameData);
+        console.log('Minesweeper game update received:', gameData);
         
         // Update game state based on creator's actions
         if (gameData.status === 'playing') {
@@ -843,11 +849,11 @@ const MinesweeperGame: React.FC = () => {
       });
       
       setUnsubscribeRef(() => unsubscribe);
+      console.log("Successfully joined minesweeper game and established connection");
       
     } catch (error) {
-      console.error('Error joining game:', error);
-      alert(error.message || 'Failed to join game. Please try again.');
-      resetGame();
+      console.error("Error joining minesweeper game:", error);
+      throw error;
     }
   };
   
@@ -1420,6 +1426,49 @@ const MinesweeperGame: React.FC = () => {
     setGameMessages(prev => [...prev, message]);
     setLastActionTime(new Date().toLocaleTimeString());
   };
+  
+  // Update useEffect to properly handle game links
+  useEffect(() => {
+    const handleGameId = async () => {
+      // Check if there's a game ID in the URL
+      const { id } = router.query;
+      console.log("Router query for minesweeper:", router.query);
+      
+      if (id && typeof id === 'string') {
+        console.log(`Detected game ID: ${id}`);
+        setGameId(id);
+        setIsCreator(false);
+        setIsMultiplayer(true);
+        
+        // When joining a game
+        if (connected && publicKey) {
+          console.log(`User connected with wallet ${publicKey}, joining game ${id}`);
+          try {
+            await joinGame(id);
+          } catch (error) {
+            console.error("Failed to join minesweeper game:", error);
+            alert(`Could not join game: ${error.message || "Unknown error"}`);
+            resetGame();
+          }
+        } else {
+          console.log("Wallet not connected, prompting user to connect");
+          alert("Please connect your wallet to join this multiplayer game");
+          openWalletModal();
+        }
+      }
+    };
+    
+    if (router.isReady) {
+      handleGameId();
+    }
+    
+    return () => {
+      // Cleanup Firebase listener
+      if (unsubscribeRef) {
+        unsubscribeRef();
+      }
+    };
+  }, [router.isReady, router.query, connected, publicKey]);
   
   // Simulate opponent joining
   useEffect(() => {
