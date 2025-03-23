@@ -88,7 +88,7 @@ const CloseButton = styled.button`
   }
 `;
 
-const ChatToggleButton = styled.button`
+const ChatToggleButton = styled.button<{ isOpen: boolean }>`
   position: fixed;
   right: ${props => props.isOpen ? '360px' : '0'};
   top: 50%;

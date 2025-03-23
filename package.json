@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "fix-styled": "node scripts/fix-styled-components.js",
+    "deploy": "vercel deploy --prod"
   },
   "dependencies": {
     "@solana/wallet-adapter-base": "^0.9.23",

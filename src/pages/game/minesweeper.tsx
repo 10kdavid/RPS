@@ -541,7 +541,7 @@ const SectionTitle = styled.h3`
   margin-bottom: 15px;
 `;
 
-const Sidebar = styled.div`
+const Sidebar = styled.div<{ collapsed: boolean }>`
   width: 250px;
   background-color: #142438;
   border-radius: 12px;

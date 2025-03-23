@@ -306,6 +306,36 @@ const ButtonGroup = styled.div`
   margin-top: 30px;
 `;
 
+const PrimaryButton = styled.button`
+  padding: 10px 20px;
+  background-color: var(--button-primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background-color: var(--button-hover);
+  }
+`;
+
+const SecondaryButton = styled.button`
+  padding: 10px 20px;
+  background-color: transparent;
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+`;
+
 const SaveButton = styled(PrimaryButton)`
   background-color: var(--button-primary);
 `;
