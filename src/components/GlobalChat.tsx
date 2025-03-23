@@ -86,13 +86,9 @@ const CloseButton = styled.button`
   }
 `;
 
-// Replace the ChatToggleButton with the utility version
-const ChatToggleButton = styled.button.attrs<{isOpen: boolean}>(props => ({
-  // This explicitly declares the isOpen prop so TypeScript knows about it
-  isOpen: props.isOpen,
-}))<{isOpen: boolean}>`
+// Create a basic styled button without the isOpen prop
+const StyledToggleButton = styled.button`
   position: fixed;
-  right: ${props => props.isOpen ? '360px' : '0'};
   top: 50%;
   transform: translateY(-50%);
   background-color: var(--button-primary);
@@ -113,6 +109,22 @@ const ChatToggleButton = styled.button.attrs<{isOpen: boolean}>(props => ({
     background-color: var(--button-hover);
   }
 `;
+
+// Create a wrapper component that handles the isOpen prop
+const ChatToggleButton: React.FC<{onClick: () => void; isOpen: boolean; children: React.ReactNode}> = ({ 
+  onClick, 
+  isOpen, 
+  children 
+}) => {
+  return (
+    <StyledToggleButton 
+      onClick={onClick} 
+      style={{ right: isOpen ? '360px' : '0' }}
+    >
+      {children}
+    </StyledToggleButton>
+  );
+};
 
 const ChatTabs = styled.div`
   display: flex;

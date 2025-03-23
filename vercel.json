@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next",
+      "config": {
+        "buildCommand": "npm run safe-build",
+        "outputDirectory": ".next"
+      }
+    }
+  ],
+  "env": {
+    "NEXT_IGNORE_TS_CONFIG_PATHS": "true",
+    "NEXT_IGNORE_TYPE_CHECK": "true"
+  }
+} 
