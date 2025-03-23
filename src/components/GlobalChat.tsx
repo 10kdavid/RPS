@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { useWallet } from '../contexts/WalletContext';
-import { styledButton, styledDiv, WithIsOpen } from '../utils/styled-components-fix';
 
 // Types
 interface ChatMessage {
@@ -19,11 +18,9 @@ interface Props {
 }
 
 // Styled Components
-interface ChatContainerProps {
-  isOpen: boolean;
-}
-
-const ChatContainer = styledDiv.withIsOpen`
+const ChatContainer = styled.div.attrs<{isOpen: boolean}>(props => ({
+  isOpen: props.isOpen,
+}))<{isOpen: boolean}>`
   position: fixed;
   right: ${props => props.isOpen ? '0' : '-360px'};
   top: 0;
@@ -89,13 +86,11 @@ const CloseButton = styled.button`
   }
 `;
 
-// Define a proper interface for the button props
-interface ToggleButtonProps {
-  isOpen: boolean;
-}
-
 // Replace the ChatToggleButton with the utility version
-const ChatToggleButton = styledButton.withIsOpen`
+const ChatToggleButton = styled.button.attrs<{isOpen: boolean}>(props => ({
+  // This explicitly declares the isOpen prop so TypeScript knows about it
+  isOpen: props.isOpen,
+}))<{isOpen: boolean}>`
   position: fixed;
   right: ${props => props.isOpen ? '360px' : '0'};
   top: 50%;
@@ -124,11 +119,9 @@ const ChatTabs = styled.div`
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
-interface TabProps {
-  active: boolean;
-}
-
-const ChatTab = styled.div<TabProps>`
+const ChatTab = styled.div.attrs<{active: boolean}>(props => ({
+  active: props.active,
+}))<{active: boolean}>`
   flex: 1;
   padding: 12px;
   text-align: center;
@@ -166,19 +159,20 @@ const MessagesContainer = styled.div`
   }
 `;
 
-interface MessageProps {
-  isMine?: boolean;
-  isSystem?: boolean;
-}
-
-const MessageWrapper = styled.div<MessageProps>`
+const MessageWrapper = styled.div.attrs<{isMine?: boolean; isSystem?: boolean}>(props => ({
+  isMine: props.isMine,
+  isSystem: props.isSystem,
+}))<{isMine?: boolean; isSystem?: boolean}>`
   display: flex;
   flex-direction: column;
   align-items: ${props => props.isMine ? 'flex-end' : 'flex-start'};
   max-width: 100%;
 `;
 
-const MessageBubble = styled.div<MessageProps>`
+const MessageBubble = styled.div.attrs<{isMine?: boolean; isSystem?: boolean}>(props => ({
+  isMine: props.isMine,
+  isSystem: props.isSystem,
+}))<{isMine?: boolean; isSystem?: boolean}>`
   background-color: ${props => {
     if (props.isSystem) return 'rgba(59, 130, 246, 0.2)';
     return props.isMine ? 'var(--button-primary)' : 'rgba(255, 255, 255, 0.1)';
@@ -360,7 +354,9 @@ const UserStatus = styled.div`
   gap: 5px;
 `;
 
-const StatusDot = styled.div<{isOnline: boolean}>`
+const StatusDot = styled.div.attrs<{isOnline: boolean}>(props => ({
+  isOnline: props.isOnline,
+}))<{isOnline: boolean}>`
   width: 8px;
   height: 8px;
   border-radius: 50%;

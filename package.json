@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "fix-styled": "node scripts/fix-styled-components.js",
-    "deploy": "vercel deploy --prod"
+    "deploy": "vercel deploy --prod",
+    "deploy-to-vercel": "git add . && git commit -m \"Ready for deployment\" && git push && vercel"
   },
   "dependencies": {
     "@solana/wallet-adapter-base": "^0.9.23",
