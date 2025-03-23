@@ -771,8 +771,16 @@ const MinesweeperGame: React.FC = () => {
   
   // Generate a unique game link for inviting opponents
   const generateGameLink = () => {
-    if (!gameId) return "";
-    return `${window.location.origin}/game/minesweeper?id=${gameId}`;
+    if (gameId) {
+      // Fix: Ensure we use the correct production URL without Vercel preview domains
+      const baseUrl = window.location.origin;
+      // Remove any Vercel preview URLs if present
+      const productionUrl = baseUrl.includes('vercel.app') 
+        ? 'https://rockpapersolana.com' // Replace with your actual domain
+        : baseUrl;
+        
+      setGameLink(`${productionUrl}/game/minesweeper?id=${gameId}`);
+    }
   };
 
   // Copy game link to clipboard

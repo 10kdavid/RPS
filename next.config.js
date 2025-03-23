@@ -23,7 +23,7 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-eval' 'unsafe-inline' *.firebaseio.com; connect-src 'self' *.firebaseio.com *.firebase.com *.firebase.googleapis.com *.solana.com firebase.googleapis.com firebaseinstallations.googleapis.com identitytoolkit.googleapis.com; img-src 'self' data:;",
+            value: "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-eval' 'unsafe-inline' *.firebaseio.com; connect-src 'self' *.firebaseio.com *.firebase.com *.firebase.googleapis.com *.solana.com firebase.googleapis.com firebaseinstallations.googleapis.com identitytoolkit.googleapis.com; img-src 'self' data:; frame-ancestors 'self' https://*.vercel.app https://*.rockpapersolana.com;",
           },
         ],
       },

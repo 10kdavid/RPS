@@ -768,7 +768,15 @@ const BlackjackGame: React.FC = () => {
       const randomCode = gameId;
       setInviteCode(randomCode);
       setGameSessionId(gameId);
-      setGameLink(`${window.location.origin}/game/blackjack?invite=${randomCode}`);
+      
+      // Fix: Ensure we use the correct production URL without Vercel preview domains
+      const baseUrl = window.location.origin;
+      // Remove any Vercel preview URLs if present
+      const productionUrl = baseUrl.includes('vercel.app') 
+        ? 'https://rockpapersolana.com' // Replace with your actual domain
+        : baseUrl;
+      
+      setGameLink(`${productionUrl}/game/blackjack?invite=${randomCode}`);
       
       // Set game state to waiting for opponent
       setConnectionState(ConnectionState.WAITING_FOR_OPPONENT);
