@@ -6,11 +6,13 @@ import {
   useWallet as useSolanaWallet
 } from '@solana/wallet-adapter-react';
 import { WalletModalProvider, useWalletModal } from '@solana/wallet-adapter-react-ui';
-import { clusterApiUrl } from '@solana/web3.js';
+import { clusterApiUrl, Connection } from '@solana/web3.js';
 import { 
   PhantomWalletAdapter, 
   SolflareWalletAdapter, 
-  TorusWalletAdapter 
+  TorusWalletAdapter,
+  BackpackWalletAdapter,
+  LedgerWalletAdapter
 } from '@solana/wallet-adapter-wallets';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 
@@ -25,6 +27,7 @@ export interface WalletContextValue {
   connectWallet: () => Promise<void>;
   disconnectWallet: () => Promise<void>;
   openWalletModal: () => void;
+  refreshBalance: () => Promise<void>;
 }
 
 // Create context with default values
@@ -34,7 +37,8 @@ const WalletContext = createContext<WalletContextValue>({
   publicKey: null,
   connectWallet: async () => {},
   disconnectWallet: async () => {},
-  openWalletModal: () => {}
+  openWalletModal: () => {},
+  refreshBalance: async () => {}
 });
 
 // Create hook for using the wallet context
@@ -71,6 +75,19 @@ export const WalletContextProvider: React.FC<{ children: ReactNode }> = ({ child
     setVisible(true);
   };
 
+  // Function to manually refresh the balance
+  const refreshBalance = async (): Promise<void> => {
+    if (wallet.publicKey && connection) {
+      try {
+        const walletBalance = await connection.getBalance(wallet.publicKey);
+        setBalance(walletBalance / LAMPORTS_PER_SOL); // Convert lamports to SOL
+        console.log("Refreshed balance:", walletBalance / LAMPORTS_PER_SOL);
+      } catch (error) {
+        console.error('Error refreshing balance:', error);
+      }
+    }
+  };
+
   // Fetch wallet balance whenever the wallet is connected
   useEffect(() => {
     if (wallet.publicKey && connection) {
@@ -78,6 +95,7 @@ export const WalletContextProvider: React.FC<{ children: ReactNode }> = ({ child
         try {
           const walletBalance = await connection.getBalance(wallet.publicKey!);
           setBalance(walletBalance / LAMPORTS_PER_SOL); // Convert lamports to SOL
+          console.log("Updated balance:", walletBalance / LAMPORTS_PER_SOL);
         } catch (error) {
           console.error('Error fetching balance:', error);
           setBalance(0);
@@ -86,8 +104,8 @@ export const WalletContextProvider: React.FC<{ children: ReactNode }> = ({ child
 
       fetchBalance();
 
-      // Set up interval to update balance every 15 seconds
-      const intervalId = setInterval(fetchBalance, 15000);
+      // Set up interval to update balance every 10 seconds
+      const intervalId = setInterval(fetchBalance, 10000);
 
       return () => clearInterval(intervalId);
     } else {
@@ -102,7 +120,8 @@ export const WalletContextProvider: React.FC<{ children: ReactNode }> = ({ child
     publicKey: wallet.publicKey ? wallet.publicKey.toString() : null,
     connectWallet,
     disconnectWallet,
-    openWalletModal
+    openWalletModal,
+    refreshBalance
   };
 
   return (
@@ -114,13 +133,20 @@ export const WalletContextProvider: React.FC<{ children: ReactNode }> = ({ child
 
 // Wallet provider wrapper component
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Set up Solana network (Use mainnet-beta for production)
-  const network = clusterApiUrl('mainnet-beta');
+  // Use more reliable Solana RPC endpoints
+  // First try a public RPC endpoint
+  const HELIUS_API_KEY = "54fd62a3-9fa7-4a61-a01a-27452a798977";
+  const network = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
+  
+  // Fallback to standard endpoint if needed
+  const fallbackNetwork = clusterApiUrl('mainnet-beta');
 
   // Define supported wallet adapters
   const wallets = [
     new PhantomWalletAdapter(),
     new SolflareWalletAdapter(),
+    new BackpackWalletAdapter(),
+    new LedgerWalletAdapter(),
     new TorusWalletAdapter()
   ];
 

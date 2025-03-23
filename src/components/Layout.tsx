@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { useRouter } from 'next/router';
-import { useWallet, WalletProvider } from '../contexts/WalletContext';
+import { useWallet } from '../contexts/WalletContext';
 import GlobalChat from './GlobalChat';
 import Link from 'next/link';
 
@@ -203,7 +203,7 @@ const MobileNavLink = styled.div`
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const router = useRouter();
-  const { connected, balance, publicKey, openWalletModal, disconnectWallet } = useWallet();
+  const { connected, balance, publicKey, openWalletModal, disconnectWallet, refreshBalance } = useWallet();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [walletDropdownOpen, setWalletDropdownOpen] = useState(false);
@@ -215,6 +215,27 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (!address) return '';
     return `${address.slice(0, 4)}...${address.slice(-4)}`;
   };
+  
+  // Effect to handle wallet dropdown clicks outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setWalletDropdownOpen(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+  
+  // Effect to refresh balance when wallet is connected
+  useEffect(() => {
+    if (connected) {
+      refreshBalance();
+    }
+  }, [connected, refreshBalance]);
   
   const toggleChat = () => {
     setIsChatOpen(prev => !prev);
@@ -230,6 +251,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   
   const toggleWalletDropdown = () => {
     setWalletDropdownOpen(!walletDropdownOpen);
+    if (!walletDropdownOpen && connected) {
+      refreshBalance();
+    }
+  };
+  
+  const handleConnectWallet = () => {
+    openWalletModal();
   };
 
   return (
@@ -268,26 +296,70 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         
         <HeaderActions>
           {connected ? (
-            <>
-              <WalletInfo onClick={toggleWalletDropdown} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                <span>{balance?.toFixed(4) || '0.0000'} SOL</span>
-                <WalletAddress>{formatWalletAddress(publicKey)}</WalletAddress>
-                <DropdownIcon>▼</DropdownIcon>
-              </WalletInfo>
-              <PrimaryButton onClick={() => router.push('/wallet')} style={{ background: '#00c853' }}>
-                My Wallet
-              </PrimaryButton>
-            </>
+            <WalletInfo onClick={toggleWalletDropdown} ref={dropdownRef} style={{ cursor: 'pointer', position: 'relative' }}>
+              {balance.toFixed(2)} SOL
+              <WalletAddress>{formatWalletAddress(publicKey)}</WalletAddress>
+              <DropdownIcon>▼</DropdownIcon>
+              
+              {walletDropdownOpen && (
+                <div style={{
+                  position: 'absolute',
+                  top: '40px',
+                  right: '0',
+                  background: 'var(--card-bg)',
+                  width: '180px',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  border: '1px solid var(--border-color)',
+                  zIndex: 100
+                }}>
+                  <div style={{
+                    padding: '12px 15px',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }} onClick={() => {
+                    navigator.clipboard.writeText(publicKey || '');
+                    setWalletDropdownOpen(false);
+                  }}>
+                    <span style={{ marginRight: '8px' }}>📋</span> Copy Address
+                  </div>
+                  <div style={{
+                    padding: '12px 15px',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }} onClick={() => {
+                    refreshBalance();
+                  }}>
+                    <span style={{ marginRight: '8px' }}>🔄</span> Refresh Balance
+                  </div>
+                  <div style={{
+                    padding: '12px 15px',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }} onClick={() => {
+                    disconnectWallet();
+                    setWalletDropdownOpen(false);
+                  }}>
+                    <span style={{ marginRight: '8px' }}>🔌</span> Disconnect
+                  </div>
+                </div>
+              )}
+            </WalletInfo>
           ) : (
-            <>
-              <SecondaryButton onClick={openWalletModal}>
-                Login
-              </SecondaryButton>
-              <PrimaryButton onClick={openWalletModal} style={{ background: '#00c853' }}>
-                Connect Wallet
-              </PrimaryButton>
-            </>
+            <PrimaryButton onClick={handleConnectWallet}>
+              Connect Wallet
+            </PrimaryButton>
           )}
+          
+          <SecondaryButton onClick={toggleChat}>
+            Chat
+          </SecondaryButton>
           
           <MobileMenuButton onClick={toggleMobileMenu}>
             ☰
@@ -344,11 +416,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 };
 
 const LayoutWithProvider: React.FC<LayoutProps> = (props) => {
-  return (
-    <WalletProvider>
-      <Layout {...props} />
-    </WalletProvider>
-  );
+  return <Layout {...props} />;
 };
 
 export default LayoutWithProvider; 

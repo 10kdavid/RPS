@@ -2,6 +2,7 @@ import React from 'react';
 import type { AppProps } from 'next/app';
 import { ThemeProvider } from 'styled-components';
 import Layout from '../components/Layout';
+import WalletProvider from '../contexts/WalletContext';
 import '../styles/globals.css';
 
 const theme = {
@@ -36,9 +37,11 @@ const theme = {
 function MyApp({ Component, pageProps }: AppProps) {
   return (
     <ThemeProvider theme={theme}>
-      <Layout>
-        <Component {...pageProps} />
-      </Layout>
+      <WalletProvider>
+        <Layout>
+          <Component {...pageProps} />
+        </Layout>
+      </WalletProvider>
     </ThemeProvider>
   );
 }

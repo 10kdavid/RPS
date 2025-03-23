@@ -174,7 +174,7 @@ const MobileNavLink = styled.div`
 
 const Navbar = () => {
   const router = useRouter();
-  const { connected, balance, publicKey, openWalletModal, disconnectWallet } = useWallet();
+  const { connected, balance, publicKey, openWalletModal, disconnectWallet, refreshBalance } = useWallet();
   const [walletDropdownOpen, setWalletDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -198,6 +198,13 @@ const Navbar = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // Refresh balance whenever the dropdown is opened
+  useEffect(() => {
+    if (walletDropdownOpen && connected) {
+      refreshBalance();
+    }
+  }, [walletDropdownOpen, connected, refreshBalance]);
   
   // Copy wallet address to clipboard
   const copyAddressToClipboard = () => {
@@ -220,9 +227,17 @@ const Navbar = () => {
     setWalletDropdownOpen(false);
   };
   
+  // Handle wallet connect
+  const handleConnectWallet = () => {
+    openWalletModal();
+  };
+  
   // Toggle wallet dropdown
   const toggleWalletDropdown = () => {
     setWalletDropdownOpen(!walletDropdownOpen);
+    if (!walletDropdownOpen && connected) {
+      refreshBalance();
+    }
   };
   
   // Toggle mobile menu
@@ -269,18 +284,21 @@ const Navbar = () => {
           {connected ? (
             <>
               <BalanceDisplay onClick={toggleWalletDropdown}>
-                <Balance>{balance.toFixed(4)} SOL</Balance>
+                <Balance>{balance.toFixed(2)} SOL</Balance>
                 <WalletAddress>{formatWalletAddress(publicKey)}</WalletAddress>
                 <DropdownIcon>▼</DropdownIcon>
               </BalanceDisplay>
               
               {walletDropdownOpen && (
                 <WalletDropdown>
-                  <DropdownItem onClick={navigateToWallet}>
-                    <DropdownIcon2>💰</DropdownIcon2> Wallet
-                  </DropdownItem>
                   <DropdownItem onClick={copyAddressToClipboard}>
                     <DropdownIcon2>📋</DropdownIcon2> Copy Address
+                  </DropdownItem>
+                  <DropdownItem onClick={navigateToWallet}>
+                    <DropdownIcon2>👛</DropdownIcon2> Wallet Details
+                  </DropdownItem>
+                  <DropdownItem onClick={refreshBalance}>
+                    <DropdownIcon2>🔄</DropdownIcon2> Refresh Balance
                   </DropdownItem>
                   <DropdownItem onClick={handleDisconnect}>
                     <DropdownIcon2>🔌</DropdownIcon2> Disconnect
@@ -289,7 +307,7 @@ const Navbar = () => {
               )}
             </>
           ) : (
-            <WalletButton onClick={openWalletModal}>
+            <WalletButton onClick={handleConnectWallet}>
               Connect Wallet
             </WalletButton>
           )}
