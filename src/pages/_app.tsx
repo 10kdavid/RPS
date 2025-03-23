@@ -1,23 +1,24 @@
 import React from 'react';
 import type { AppProps } from 'next/app';
-import { ThemeProvider } from 'styled-components';
+import { ThemeProvider, createGlobalStyle } from 'styled-components';
 import Layout from '../components/Layout';
 import WalletProvider from '../contexts/WalletContext';
 import '../styles/globals.css';
 
+// Define theme for styled-components
 const theme = {
   colors: {
-    primary: '#3b82f6',
-    primaryHover: '#2563eb',
-    secondary: '#6b7280',
-    textPrimary: '#f3f4f6',
-    textSecondary: '#9ca3af',
-    background: '#111827',
-    cardBackground: '#1f2937',
-    border: '#374151',
-    success: '#10b981',
-    error: '#ef4444',
-    warning: '#f59e0b',
+    primary: 'var(--button-primary)',
+    primaryHover: 'var(--button-hover)',
+    secondary: 'var(--text-secondary)',
+    textPrimary: 'var(--text-primary)',
+    textSecondary: 'var(--text-secondary)',
+    background: 'var(--primary-bg)',
+    cardBackground: 'var(--card-bg)',
+    border: 'var(--border-color)',
+    success: 'var(--button-success)',
+    error: 'var(--button-danger)',
+    warning: 'var(--accent-yellow)',
   },
   fontSizes: {
     small: '0.875rem',
@@ -34,15 +35,31 @@ const theme = {
   },
 };
 
+// Global styles to ensure consistent rendering
+const GlobalStyle = createGlobalStyle`
+  body {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    background: var(--primary-bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+`;
+
 function MyApp({ Component, pageProps }: AppProps) {
   return (
-    <ThemeProvider theme={theme}>
-      <WalletProvider>
-        <Layout>
-          <Component {...pageProps} />
-        </Layout>
-      </WalletProvider>
-    </ThemeProvider>
+    <>
+      <GlobalStyle />
+      <ThemeProvider theme={theme}>
+        <WalletProvider>
+          <Layout>
+            <Component {...pageProps} />
+          </Layout>
+        </WalletProvider>
+      </ThemeProvider>
+    </>
   );
 }
 

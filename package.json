@@ -11,7 +11,9 @@
     "lint": "next lint",
     "fix-styled": "node scripts/fix-styled-components.js",
     "deploy": "vercel deploy --prod",
-    "deploy-to-vercel": "git add . && git commit -m \"Ready for deployment\" && git push && vercel"
+    "deploy-to-vercel": "git add . && git commit -m \"Ready for deployment\" && git push && vercel",
+    "deploy-full": "npm run safe-build && npm run deploy",
+    "deploy-css-fix": "cross-env NODE_ENV=production NEXT_PUBLIC_STYLED_JSX=true npm run safe-build"
   },
   "dependencies": {
     "@solana/wallet-adapter-base": "^0.9.23",
@@ -19,6 +21,7 @@
     "@solana/wallet-adapter-react-ui": "^0.9.34",
     "@solana/wallet-adapter-wallets": "^0.19.23",
     "@solana/web3.js": "^1.78.5",
+    "firebase": "^11.5.0",
     "next": "^14.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -31,6 +34,7 @@
     "@types/react": "^18.2.21",
     "@types/react-dom": "^18.2.7",
     "@types/styled-components": "^5.1.34",
+    "babel-plugin-styled-components": "^2.1.4",
     "cross-env": "^7.0.3",
     "eslint": "^8.52.0",
     "eslint-config-next": "^14.0.1",

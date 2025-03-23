@@ -1,0 +1,11 @@
+Fix styled-components, wallet functionality, and implement real multiplayer
+
+This commit includes several major improvements:
+
+1. Fixed styled-components TypeScript errors using the $ prefix pattern
+2. Improved wallet functionality with reliable RPC endpoints and balance display
+3. Implemented fully functional multiplayer using Firebase Realtime Database
+4. Added working game links that correctly connect players to the same game
+5. Updated deployment configuration for optimal performance
+
+The app is now ready for production deployment on Vercel. 

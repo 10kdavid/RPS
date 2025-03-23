@@ -5,6 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useWallet } from '../../contexts/WalletContext';
 import AppSidebar from '../../components/Sidebar';
+import { 
+  createGameSession, 
+  joinGameSession, 
+  listenToGameUpdates, 
+  updateGameState 
+} from '../../utils/firebase';
 
 // Game constants and types
 enum GameState {
@@ -643,6 +649,30 @@ const BlackjackGame: React.FC = () => {
   const [gameLink, setGameLink] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   
+  // Add new state for Firebase
+  const [unsubscribeRef, setUnsubscribeRef] = useState<any>(null);
+  const [gameSessionId, setGameSessionId] = useState<string | null>(null);
+  
+  // Check for invite code in URL when component mounts
+  useEffect(() => {
+    const { invite } = router.query;
+    if (invite && typeof invite === 'string') {
+      setInviteCode(invite);
+      if (connected) {
+        handleJoinGame();
+      }
+    }
+  }, [router.query, connected]);
+  
+  // Cleanup Firebase listeners when component unmounts
+  useEffect(() => {
+    return () => {
+      if (unsubscribeRef) {
+        unsubscribeRef();
+      }
+    };
+  }, [unsubscribeRef]);
+  
   // Game setup state
   
   // Generate a new deck of cards
@@ -702,73 +732,134 @@ const BlackjackGame: React.FC = () => {
   };
   
   // Function to handle creating a game for opponent to join
-  const handleCreateGame = () => {
-    if (!connected) {
+  const handleCreateGame = async () => {
+    if (!connected || !publicKey) {
       alert('Please connect your wallet first.');
+      openWalletModal();
       return;
     }
     
-    // Generate a unique game code
-    const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    setInviteCode(randomCode);
-    setGameLink(`${window.location.origin}/game/blackjack?invite=${randomCode}`);
-    
-    // Set game state to waiting for opponent
-    setConnectionState(ConnectionState.WAITING_FOR_OPPONENT);
-    setGameState(GameState.WAITING);
-    
-    // In a real implementation, this would communicate with a server
-    // For now, we'll just simulate it
-    console.log(`Game created with code: ${randomCode}`);
-  };
-  
-  // Function to handle finding an opponent
-  const handleFindOpponent = () => {
-    if (!connected) {
-      alert('Please connect your wallet first.');
-      return;
+    try {
+      // Create a game session in Firebase
+      const gameId = await createGameSession('blackjack', publicKey.toString());
+      
+      // Generate a random code for easier sharing
+      const randomCode = gameId;
+      setInviteCode(randomCode);
+      setGameSessionId(gameId);
+      setGameLink(`${window.location.origin}/game/blackjack?invite=${randomCode}`);
+      
+      // Set game state to waiting for opponent
+      setConnectionState(ConnectionState.WAITING_FOR_OPPONENT);
+      setGameState(GameState.WAITING);
+      
+      // Listen for opponent joining
+      const unsubscribe = listenToGameUpdates('blackjack', gameId, (gameData) => {
+        console.log('Game update:', gameData);
+        
+        // Check if opponent joined
+        if (gameData.status === 'playing' && gameData.opponent) {
+          setConnectionState(ConnectionState.OPPONENT_CONNECTED);
+          setCurrentTurn(gameData.currentTurn === publicKey.toString() ? PlayerTurn.PLAYER : PlayerTurn.OPPONENT);
+          startGame();
+        }
+        
+        // Check for game state updates from opponent
+        if (gameData.gameData && gameData.currentTurn !== publicKey.toString()) {
+          // Update game state based on opponent's actions
+          if (gameData.gameData.opponentHand) {
+            setOpponentHand(gameData.gameData.opponentHand);
+          }
+          if (gameData.gameData.opponentScore) {
+            setOpponentScore(gameData.gameData.opponentScore);
+          }
+          if (gameData.gameData.currentTurn === 'player') {
+            setCurrentTurn(PlayerTurn.PLAYER);
+          }
+          if (gameData.gameData.result !== GameResult.NOT_DETERMINED) {
+            setResult(gameData.gameData.result);
+            setGameState(GameState.RESULT);
+          }
+        }
+      });
+      
+      setUnsubscribeRef(() => unsubscribe);
+      
+      console.log(`Game created with code: ${randomCode}`);
+    } catch (error) {
+      console.error('Error creating game:', error);
+      alert('Failed to create game. Please try again.');
     }
-    
-    // In a real implementation, this would connect to a matchmaking service
-    // For now, we'll just simulate finding an opponent after a delay
-    setConnectionState(ConnectionState.CONNECTING);
-    
-    setTimeout(() => {
-      setConnectionState(ConnectionState.OPPONENT_CONNECTED);
-      startGame();
-    }, 2000);
   };
   
   // Function to handle joining a game with invite code
-  const handleJoinGame = () => {
+  const handleJoinGame = async () => {
     if (!inviteCode) {
       alert('Please enter an invite code.');
       return;
     }
     
-    if (!connected) {
+    if (!connected || !publicKey) {
       alert('Please connect your wallet first.');
+      openWalletModal();
       return;
     }
     
-    // In a real implementation, this would verify the code with a server
-    // For now, we'll just simulate joining
     setConnectionState(ConnectionState.CONNECTING);
     
-    setTimeout(() => {
-      setConnectionState(ConnectionState.OPPONENT_CONNECTED);
-      startGame();
-    }, 1500);
-  };
-  
-  // Function to copy game link to clipboard
-  const copyGameLink = () => {
-    navigator.clipboard.writeText(gameLink);
-    alert('Game link copied to clipboard!');
+    try {
+      // Join the game in Firebase
+      const success = await joinGameSession('blackjack', inviteCode, publicKey.toString());
+      
+      if (!success) {
+        throw new Error('Failed to join game. It may no longer be available.');
+      }
+      
+      setGameSessionId(inviteCode);
+      
+      // Listen for game updates
+      const unsubscribe = listenToGameUpdates('blackjack', inviteCode, (gameData) => {
+        console.log('Game update:', gameData);
+        
+        // Update game state based on creator's actions
+        if (gameData.status === 'playing') {
+          setConnectionState(ConnectionState.OPPONENT_CONNECTED);
+          setCurrentTurn(gameData.currentTurn === publicKey.toString() ? PlayerTurn.PLAYER : PlayerTurn.OPPONENT);
+          
+          if (gameState === GameState.WAITING || gameState === GameState.IDLE) {
+            startGame();
+          }
+          
+          // Update local game state from Firebase
+          if (gameData.gameData) {
+            if (gameData.gameData.playerHand && gameData.currentTurn !== publicKey.toString()) {
+              setOpponentHand(gameData.gameData.playerHand);
+            }
+            if (gameData.gameData.playerScore && gameData.currentTurn !== publicKey.toString()) {
+              setOpponentScore(gameData.gameData.playerScore);
+            }
+            if (gameData.gameData.currentTurn === 'opponent' && publicKey.toString() !== gameData.creator) {
+              setCurrentTurn(PlayerTurn.PLAYER);
+            }
+            if (gameData.gameData.result !== GameResult.NOT_DETERMINED) {
+              setResult(gameData.gameData.result);
+              setGameState(GameState.RESULT);
+            }
+          }
+        }
+      });
+      
+      setUnsubscribeRef(() => unsubscribe);
+      
+    } catch (error) {
+      console.error('Error joining game:', error);
+      alert(error.message || 'Failed to join game. Please try again.');
+      setConnectionState(ConnectionState.DISCONNECTED);
+    }
   };
   
   // Player actions
-  const handleHit = () => {
+  const handleHit = async () => {
     if (gameState !== GameState.PLAYING || currentTurn !== PlayerTurn.PLAYER) return;
     
     const deck = generateDeck();
@@ -783,27 +874,68 @@ const BlackjackGame: React.FC = () => {
     if (newScore > 21) {
       setResult(GameResult.LOSE);
       setGameState(GameState.RESULT);
+      
+      // Update game state in Firebase
+      if (gameSessionId) {
+        await updateGameState('blackjack', gameSessionId, {
+          gameData: {
+            playerHand: updatedHand,
+            playerScore: newScore,
+            result: GameResult.LOSE,
+            lastAction: 'hit',
+            currentTurn: 'opponent'
+          }
+        });
+      }
     } else {
       // Switch turn to opponent
       setCurrentTurn(PlayerTurn.OPPONENT);
       
-      // Simulate opponent's turn after a delay
-      setTimeout(() => {
-        handleOpponentTurn();
-      }, 1500);
+      // Update game state in Firebase
+      if (gameSessionId) {
+        await updateGameState('blackjack', gameSessionId, {
+          currentTurn: publicKey ? (publicKey.toString() === gameSessionId ? gameSessionId : publicKey.toString()) : '',
+          gameData: {
+            playerHand: updatedHand,
+            playerScore: newScore,
+            lastAction: 'hit',
+            currentTurn: 'opponent'
+          }
+        });
+      }
+      
+      // If playing against computer, simulate opponent's turn
+      if (connectionState !== ConnectionState.OPPONENT_CONNECTED) {
+        setTimeout(() => {
+          handleOpponentTurn();
+        }, 1500);
+      }
     }
   };
   
-  const handleStand = () => {
+  const handleStand = async () => {
     if (gameState !== GameState.PLAYING || currentTurn !== PlayerTurn.PLAYER) return;
     
     // Switch turn to opponent
     setCurrentTurn(PlayerTurn.OPPONENT);
     
-    // Simulate opponent's turn after a delay
-    setTimeout(() => {
-      handleOpponentTurn();
-    }, 1500);
+    // Update game state in Firebase
+    if (gameSessionId) {
+      await updateGameState('blackjack', gameSessionId, {
+        currentTurn: publicKey ? (publicKey.toString() === gameSessionId ? gameSessionId : publicKey.toString()) : '',
+        gameData: {
+          lastAction: 'stand',
+          currentTurn: 'opponent'
+        }
+      });
+    }
+    
+    // If playing against computer, simulate opponent's turn
+    if (connectionState !== ConnectionState.OPPONENT_CONNECTED) {
+      setTimeout(() => {
+        handleOpponentTurn();
+      }, 1500);
+    }
   };
   
   // Simulate opponent's turn
@@ -1164,6 +1296,30 @@ const BlackjackGame: React.FC = () => {
     setOpponentScore(calculateHandValue(opponentInitialHand));
     setGameState(GameState.PLAYING);
     setCurrentTurn(PlayerTurn.PLAYER);
+  };
+  
+  // Add the handleFindOpponent function
+  const handleFindOpponent = () => {
+    if (!connected) {
+      alert('Please connect your wallet first.');
+      openWalletModal();
+      return;
+    }
+    
+    // In a real implementation, this would connect to a matchmaking service
+    // For now, we'll just simulate finding an opponent after a delay
+    setConnectionState(ConnectionState.CONNECTING);
+    
+    setTimeout(() => {
+      setConnectionState(ConnectionState.OPPONENT_CONNECTED);
+      startGame();
+    }, 2000);
+  };
+  
+  // Function to copy game link to clipboard
+  const copyGameLink = () => {
+    navigator.clipboard.writeText(gameLink);
+    alert('Game link copied to clipboard!');
   };
   
   return (

@@ -6,6 +6,12 @@ import { useWallet } from '../../contexts/WalletContext';
 import Link from 'next/link';
 import AppSidebar from '../../components/Sidebar';
 import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { 
+  createGameSession, 
+  joinGameSession, 
+  listenToGameUpdates, 
+  updateGameState 
+} from '../../utils/firebase';
 
 // Game States & Types
 enum GameState {
@@ -728,6 +734,9 @@ const MinesweeperGame: React.FC = () => {
   const [isOpponentOnline, setIsOpponentOnline] = useState<boolean>(false);
   const [lastActionTime, setLastActionTime] = useState<string | null>(null);
   
+  // Add new state for Firebase
+  const [unsubscribeRef, setUnsubscribeRef] = useState<any>(null);
+  
   // Constants
   const GRID_SIZE = 5;
   const MINE_COUNT = 1; // Just one mine as requested
@@ -773,61 +782,153 @@ const MinesweeperGame: React.FC = () => {
     }
   };
   
-  // Add useEffect to check for game ID in URL
-  useEffect(() => {
-    // Check if there's a game ID in the URL
-    const { id } = router.query;
-    if (id && typeof id === 'string') {
-      setGameId(id);
-      setIsCreator(false);
-      // When joining a game
-      if (connected) {
-        joinGame(id);
-      }
-    }
-  }, [router.query, connected]);
-
   // Joining a game
-  const joinGame = (id: string) => {
-    if (!connected) {
+  const joinGame = async (id: string) => {
+    if (!connected || !publicKey) {
       openWalletModal();
       return;
     }
     
-    setHasOpponent(true);
-    setOpponentName("Game Creator");
-    setIsOpponentReady(true);
-    
-    // In a real implementation, you would:
-    // 1. Connect to a WebSocket or use an SDK like Pusher, Socket.io, or Firebase
-    // 2. Notify the game creator that a player has joined
-    // 3. Set up real-time communication between players
-    
-    // For now, simulate joining
-    setTimeout(() => {
-      setGrid(initializeGrid());
-      setGameState(GameState.PLAYING);
-    }, 1000);
+    try {
+      // Join the game in Firebase
+      const success = await joinGameSession('minesweeper', id, publicKey.toString());
+      
+      if (!success) {
+        throw new Error('Failed to join game. It may no longer be available.');
+      }
+      
+      setHasOpponent(true);
+      setOpponentName("Game Creator");
+      setIsOpponentReady(true);
+      
+      // Listen for game updates
+      const unsubscribe = listenToGameUpdates('minesweeper', id, (gameData) => {
+        console.log('Game update:', gameData);
+        
+        // Update game state based on creator's actions
+        if (gameData.status === 'playing') {
+          if (gameState !== GameState.PLAYING) {
+            setGameState(GameState.PLAYING);
+            // Initialize grid from creator's data or create new one
+            if (gameData.gameData && gameData.gameData.grid) {
+              setGrid(gameData.gameData.grid);
+            } else {
+              setGrid(initializeGrid());
+            }
+          }
+          
+          // Update who's turn it is
+          if (gameData.currentTurn === publicKey.toString()) {
+            setPlayerTurn(PlayerTurn.PLAYER_TWO);
+            addGameMessage("Your turn!");
+          } else {
+            setPlayerTurn(PlayerTurn.PLAYER_ONE);
+            addGameMessage("Opponent's turn");
+          }
+          
+          // Update grid if changed by opponent
+          if (gameData.gameData && gameData.gameData.grid) {
+            setGrid(gameData.gameData.grid);
+            setRevealedCount(gameData.gameData.revealedCount || 0);
+          }
+          
+          // Check game end conditions
+          if (gameData.gameData && gameData.gameData.gameState) {
+            setGameState(gameData.gameData.gameState);
+            if (gameData.gameData.gameState === GameState.GAME_OVER || gameData.gameData.gameState === GameState.WIN) {
+              setGameWinner(gameData.gameData.winner || null);
+            }
+          }
+        }
+      });
+      
+      setUnsubscribeRef(() => unsubscribe);
+      
+    } catch (error) {
+      console.error('Error joining game:', error);
+      alert(error.message || 'Failed to join game. Please try again.');
+      resetGame();
+    }
   };
   
   // Start game with a friend
-  const handleCreateGame = () => {
-    if (!connected) {
+  const handleCreateGame = async () => {
+    if (!connected || !publicKey) {
       openWalletModal();
       return;
     }
     
-    const randomId = Math.random().toString(36).substring(2, 10);
-    setGameId(randomId);
-    setIsCreator(true);
-    
-    const link = `${window.location.origin}/game/minesweeper?id=${randomId}`;
-    setGameLink(link);
-    setGameState(GameState.WAITING);
-    
-    // In a real implementation, you would:
-    // 1. Create a game session on your backend
-    // 2. Set up a listener for when a player joins
+    try {
+      // Create a game session in Firebase
+      const gameId = await createGameSession('minesweeper', publicKey.toString());
+      setGameId(gameId);
+      setIsCreator(true);
+      
+      const link = `${window.location.origin}/game/minesweeper?id=${gameId}`;
+      setGameLink(link);
+      setGameState(GameState.WAITING);
+      
+      // Initialize grid
+      const initialGrid = initializeGrid();
+      setGrid(initialGrid);
+      
+      // Listen for opponent joining
+      const unsubscribe = listenToGameUpdates('minesweeper', gameId, (gameData) => {
+        console.log('Game update:', gameData);
+        
+        // Check if opponent joined
+        if (gameData.status === 'playing' && gameData.opponent) {
+          setHasOpponent(true);
+          setOpponentName("Opponent");
+          setIsOpponentReady(true);
+          
+          if (gameState === GameState.WAITING) {
+            setGameState(GameState.PLAYING);
+            addGameMessage("Game has started!");
+          }
+          
+          // Update who's turn it is
+          if (gameData.currentTurn === publicKey.toString()) {
+            setPlayerTurn(PlayerTurn.PLAYER_ONE);
+            addGameMessage("Your turn!");
+          } else {
+            setPlayerTurn(PlayerTurn.PLAYER_TWO);
+            addGameMessage("Opponent's turn");
+          }
+          
+          // Update grid if changed by opponent
+          if (gameData.gameData && gameData.gameData.grid) {
+            setGrid(gameData.gameData.grid);
+            setRevealedCount(gameData.gameData.revealedCount || 0);
+          }
+          
+          // Check game end conditions
+          if (gameData.gameData && gameData.gameData.gameState) {
+            setGameState(gameData.gameData.gameState);
+            if (gameData.gameData.gameState === GameState.GAME_OVER || gameData.gameData.gameState === GameState.WIN) {
+              setGameWinner(gameData.gameData.winner || null);
+            }
+          }
+        }
+      });
+      
+      setUnsubscribeRef(() => unsubscribe);
+      
+      // Update game data in Firebase
+      await updateGameState('minesweeper', gameId, {
+        gameData: {
+          grid: initialGrid,
+          revealedCount: 0,
+          gameState: GameState.WAITING
+        }
+      });
+      
+      addGameMessage("Waiting for opponent to join...");
+      
+    } catch (error) {
+      console.error('Error creating game:', error);
+      alert('Failed to create game. Please try again.');
+    }
   };
   
   // Start matchmaking
@@ -933,9 +1034,17 @@ const MinesweeperGame: React.FC = () => {
     setRevealedThisTurn(0);
   };
   
-  // Override handleCellClick to handle game end conditions with wagering
-  const handleCellClick = (row: number, col: number) => {
+  // Override handleCellClick to update Firebase
+  const handleCellClick = async (row: number, col: number) => {
     if (gameState !== GameState.PLAYING || grid[row][col].revealed) return;
+    
+    // Check if it's player's turn in multiplayer
+    if (isMultiplayer && 
+        ((isCreator && playerTurn !== PlayerTurn.PLAYER_ONE) || 
+         (!isCreator && playerTurn !== PlayerTurn.PLAYER_TWO))) {
+      addGameMessage("Not your turn!");
+      return;
+    }
     
     const newGrid = [...grid];
     
@@ -944,7 +1053,7 @@ const MinesweeperGame: React.FC = () => {
     setGrid([...newGrid]);
 
     // Use setTimeout to allow animation to complete before showing result
-    setTimeout(() => {
+    setTimeout(async () => {
       newGrid[row][col].revealed = true;
       
       // Check if mine was hit
@@ -952,11 +1061,25 @@ const MinesweeperGame: React.FC = () => {
         setGrid([...newGrid]);
         setGameState(GameState.GAME_OVER);
         
-        // If multiplayer, settle the wager
-        if (isMultiplayer) {
+        // If multiplayer, settle the wager and update Firebase
+        if (isMultiplayer && gameId) {
           // Current player lost, so the other player wins
           const winner = playerTurn === PlayerTurn.PLAYER_ONE ? 'Player 2' : 'Player 1';
-          settleWager(winner);
+          setGameWinner(winner);
+          
+          // Update game state in Firebase
+          await updateGameState('minesweeper', gameId, {
+            gameData: {
+              grid: newGrid,
+              gameState: GameState.GAME_OVER,
+              winner: winner,
+              lastMove: { row, col }
+            }
+          });
+          
+          if (betAmount > 0) {
+            settleWager(winner);
+          }
         }
         return;
       }
@@ -978,9 +1101,46 @@ const MinesweeperGame: React.FC = () => {
       // Check win condition
       if (revealedCount === TOTAL_CELLS - MINE_COUNT) {
         setGameState(GameState.WIN);
-        if (isMultiplayer) {
-          settleWager(playerTurn === PlayerTurn.PLAYER_ONE ? 'Player 1' : 'Player 2');
+        
+        if (isMultiplayer && gameId) {
+          const winner = playerTurn === PlayerTurn.PLAYER_ONE ? 'Player 1' : 'Player 2';
+          setGameWinner(winner);
+          
+          // Update game state in Firebase
+          await updateGameState('minesweeper', gameId, {
+            gameData: {
+              grid: newGrid,
+              revealedCount: revealedCount,
+              gameState: GameState.WIN,
+              winner: winner,
+              lastMove: { row, col }
+            }
+          });
+          
+          if (betAmount > 0) {
+            settleWager(winner);
+          }
         }
+      } else if (isMultiplayer && gameId) {
+        // Update game state in Firebase for regular move
+        const nextTurn = playerTurn === PlayerTurn.PLAYER_ONE ? 
+          PlayerTurn.PLAYER_TWO : PlayerTurn.PLAYER_ONE;
+        
+        await updateGameState('minesweeper', gameId, {
+          currentTurn: isCreator ? 
+            (nextTurn === PlayerTurn.PLAYER_ONE ? publicKey?.toString() : '') : 
+            (nextTurn === PlayerTurn.PLAYER_TWO ? publicKey?.toString() : ''),
+          gameData: {
+            grid: newGrid,
+            revealedCount: revealedCount,
+            lastMove: { row, col }
+          }
+        });
+        
+        // Switch turns
+        setPlayerTurn(nextTurn);
+        addGameMessage(nextTurn === (isCreator ? PlayerTurn.PLAYER_ONE : PlayerTurn.PLAYER_TWO) ? 
+          "Your turn!" : "Opponent's turn");
       }
     }, 300); // Half the animation duration
   };

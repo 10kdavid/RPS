@@ -1,7 +1,24 @@
 {
   "version": 2,
-  "buildCommand": "next build",
+  "buildCommand": "npm run deploy-css-fix",
   "env": {
-    "NEXT_IGNORE_TYPE_CHECK": "true"
-  }
+    "NEXT_IGNORE_TYPE_CHECK": "true",
+    "NEXT_PUBLIC_STYLED_JSX": "true",
+    "NODE_ENV": "production"
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-eval' 'unsafe-inline' *.firebaseio.com; connect-src 'self' *.firebaseio.com *.firebase.com *.firebase.googleapis.com *.solana.com; img-src 'self' data:;"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        }
+      ]
+    }
+  ]
 } 

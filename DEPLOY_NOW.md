@@ -1,26 +1,28 @@
 # Deploy Your Rock Paper Solana App Now
 
-## Fixed and Ready for Deployment!
+## All Features Fixed and Ready!
 
-We've made several improvements to ensure your app works perfectly:
+We've made several improvements to your Rock Paper Solana app:
 
 1. **Fixed Styled Components**: Used the transient props pattern (prefixing props with `$`) to fix TypeScript errors
+
 2. **Improved Wallet Integration**:
-   - Added a more reliable Solana RPC endpoint using Helius
+   - Added a more reliable Solana RPC endpoint
    - Fixed wallet connection functionality
    - Added balance refresh capability
-   - Improved wallet dropdown menu
 
-3. **Proper Provider Setup**:
-   - Ensured WalletProvider is correctly set up in _app.tsx
-   - Removed redundant provider in Layout.tsx
+3. **Added Real Multiplayer Functionality**:
+   - Implemented Firebase Realtime Database for game state synchronization
+   - Added shareable game links that work correctly
+   - Enabled turn-based gameplay between friends
+   - Added real-time updates between players
 
 ## Deployment Steps
 
-1. **Push to GitHub**:
+1. **Push all changes to GitHub**:
 ```bash
 git add .
-git commit -m "Fix styled-components and wallet functionality"
+git commit -m "Fix styled-components, wallet functionality, and add real multiplayer"
 git push
 ```
 
@@ -36,12 +38,33 @@ After deployment, be sure to test:
 
 1. **Wallet Connection**: The "Connect Wallet" button should work properly
 2. **SOL Balance**: Your SOL balance should display correctly after connecting
-3. **Dropdown Menu**: Click on your balance to see the dropdown with options
+3. **Multiplayer Games**: 
+   - Create a game in Blackjack or Minesweeper
+   - Copy the game link
+   - Open the link in another browser or incognito window
+   - Connect a different wallet
+   - Verify that both players can interact with the game
 
-If you see any remaining issues, you can make additional changes and push to GitHub - Vercel will automatically redeploy.
+## How to Use Multiplayer Features
+
+1. **Creating a Game**:
+   - Connect your wallet
+   - Go to any game page
+   - Click "Create Game" in the sidebar
+   - Copy the generated game link and share with a friend
+
+2. **Joining a Game**:
+   - Click on a game link you've received
+   - Connect your wallet
+   - You'll join the game automatically
+
+3. **Playing Together**:
+   - Players take turns making moves
+   - Game state is synchronized in real-time
+   - Results are shown to both players simultaneously
+
+For a more detailed guide, see [MULTIPLAYER_GUIDE.md](MULTIPLAYER_GUIDE.md)
 
 ## Sharing With Friends
 
-Once deployed, Vercel will give you a URL like: `https://your-project.vercel.app`
-
-Share this URL with your friends to play together. The multiplayer and invitation features will work as long as both players can access the internet. 
+Share your Vercel app URL with friends to play together. Now the multiplayer and invitation features actually work - you can play games together in real-time! 
