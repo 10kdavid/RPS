@@ -18,11 +18,9 @@ interface Props {
 }
 
 // Styled Components
-const ChatContainer = styled.div.attrs<{isOpen: boolean}>(props => ({
-  isOpen: props.isOpen,
-}))<{isOpen: boolean}>`
+const ChatContainer = styled.div<{ $isOpen: boolean }>`
   position: fixed;
-  right: ${props => props.isOpen ? '0' : '-360px'};
+  right: ${props => props.$isOpen ? '0' : '-360px'};
   top: 0;
   height: 100vh;
   width: 360px;
@@ -32,7 +30,7 @@ const ChatContainer = styled.div.attrs<{isOpen: boolean}>(props => ({
   display: flex;
   flex-direction: column;
   transition: right 0.3s ease-in-out;
-  box-shadow: ${props => props.isOpen ? '-5px 0 15px rgba(0, 0, 0, 0.2)' : 'none'};
+  box-shadow: ${props => props.$isOpen ? '-5px 0 15px rgba(0, 0, 0, 0.2)' : 'none'};
 `;
 
 const ChatHeader = styled.div`
@@ -86,9 +84,10 @@ const CloseButton = styled.button`
   }
 `;
 
-// Create a basic styled button without the isOpen prop
-const StyledToggleButton = styled.button`
+// Use a different approach for the ChatToggleButton - using CSS props instead of isOpen
+const ChatToggleButton = styled.button<{ $isOpen: boolean }>`
   position: fixed;
+  right: ${props => props.$isOpen ? '360px' : '0'};
   top: 50%;
   transform: translateY(-50%);
   background-color: var(--button-primary);
@@ -110,37 +109,19 @@ const StyledToggleButton = styled.button`
   }
 `;
 
-// Create a wrapper component that handles the isOpen prop
-const ChatToggleButton: React.FC<{onClick: () => void; isOpen: boolean; children: React.ReactNode}> = ({ 
-  onClick, 
-  isOpen, 
-  children 
-}) => {
-  return (
-    <StyledToggleButton 
-      onClick={onClick} 
-      style={{ right: isOpen ? '360px' : '0' }}
-    >
-      {children}
-    </StyledToggleButton>
-  );
-};
-
 const ChatTabs = styled.div`
   display: flex;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
-const ChatTab = styled.div.attrs<{active: boolean}>(props => ({
-  active: props.active,
-}))<{active: boolean}>`
+const ChatTab = styled.div<{ $active: boolean }>`
   flex: 1;
   padding: 12px;
   text-align: center;
-  color: ${props => props.active ? 'white' : 'rgba(255, 255, 255, 0.6)'};
-  font-weight: ${props => props.active ? '600' : '400'};
+  color: ${props => props.$active ? 'white' : 'rgba(255, 255, 255, 0.6)'};
+  font-weight: ${props => props.$active ? '600' : '400'};
   cursor: pointer;
-  border-bottom: 2px solid ${props => props.active ? 'var(--button-primary)' : 'transparent'};
+  border-bottom: 2px solid ${props => props.$active ? 'var(--button-primary)' : 'transparent'};
   transition: all 0.2s;
   
   &:hover {
@@ -171,29 +152,23 @@ const MessagesContainer = styled.div`
   }
 `;
 
-const MessageWrapper = styled.div.attrs<{isMine?: boolean; isSystem?: boolean}>(props => ({
-  isMine: props.isMine,
-  isSystem: props.isSystem,
-}))<{isMine?: boolean; isSystem?: boolean}>`
+const MessageWrapper = styled.div<{ $isMine?: boolean; $isSystem?: boolean }>`
   display: flex;
   flex-direction: column;
-  align-items: ${props => props.isMine ? 'flex-end' : 'flex-start'};
+  align-items: ${props => props.$isMine ? 'flex-end' : 'flex-start'};
   max-width: 100%;
 `;
 
-const MessageBubble = styled.div.attrs<{isMine?: boolean; isSystem?: boolean}>(props => ({
-  isMine: props.isMine,
-  isSystem: props.isSystem,
-}))<{isMine?: boolean; isSystem?: boolean}>`
+const MessageBubble = styled.div<{ $isMine?: boolean; $isSystem?: boolean }>`
   background-color: ${props => {
-    if (props.isSystem) return 'rgba(59, 130, 246, 0.2)';
-    return props.isMine ? 'var(--button-primary)' : 'rgba(255, 255, 255, 0.1)';
+    if (props.$isSystem) return 'rgba(59, 130, 246, 0.2)';
+    return props.$isMine ? 'var(--button-primary)' : 'rgba(255, 255, 255, 0.1)';
   }};
-  color: ${props => props.isMine ? 'white' : 'rgba(255, 255, 255, 0.9)'};
+  color: ${props => props.$isMine ? 'white' : 'rgba(255, 255, 255, 0.9)'};
   padding: 10px 15px;
   border-radius: 18px;
-  border-bottom-right-radius: ${props => props.isMine ? '4px' : '18px'};
-  border-bottom-left-radius: ${props => !props.isMine ? '4px' : '18px'};
+  border-bottom-right-radius: ${props => props.$isMine ? '4px' : '18px'};
+  border-bottom-left-radius: ${props => !props.$isMine ? '4px' : '18px'};
   max-width: 85%;
   word-wrap: break-word;
   font-size: 0.9rem;
@@ -366,13 +341,11 @@ const UserStatus = styled.div`
   gap: 5px;
 `;
 
-const StatusDot = styled.div.attrs<{isOnline: boolean}>(props => ({
-  isOnline: props.isOnline,
-}))<{isOnline: boolean}>`
+const StatusDot = styled.div<{ $isOnline: boolean }>`
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: ${props => props.isOnline ? 'var(--button-primary)' : 'var(--text-secondary)'};
+  background-color: ${props => props.$isOnline ? 'var(--button-primary)' : 'var(--text-secondary)'};
 `;
 
 const SectionTitle = styled.div`
@@ -572,7 +545,7 @@ const GlobalChat: React.FC<Props> = ({ onClose }) => {
         <>
           <MessagesContainer>
             {messages.map(msg => (
-              <MessageWrapper key={msg.id} isMine={msg.isMine} isSystem={msg.isSystem}>
+              <MessageWrapper key={msg.id} $isMine={msg.isMine} $isSystem={msg.isSystem}>
                 {!msg.isSystem && !msg.isMine && (
                   <MessageInfo>
                     <MessageAvatar>{msg.avatar || msg.sender[0]}</MessageAvatar>
@@ -581,7 +554,7 @@ const GlobalChat: React.FC<Props> = ({ onClose }) => {
                   </MessageInfo>
                 )}
                 
-                <MessageBubble isMine={msg.isMine} isSystem={msg.isSystem}>
+                <MessageBubble $isMine={msg.isMine} $isSystem={msg.isSystem}>
                   {msg.message}
                 </MessageBubble>
                 
@@ -641,7 +614,7 @@ const GlobalChat: React.FC<Props> = ({ onClose }) => {
                   <UserInfo>
                     <UserName>{user.name}</UserName>
                     <UserStatus>
-                      <StatusDot isOnline={true} />
+                      <StatusDot $isOnline={true} />
                       Online
                     </UserStatus>
                   </UserInfo>
@@ -659,7 +632,7 @@ const GlobalChat: React.FC<Props> = ({ onClose }) => {
                   <UserInfo>
                     <UserName>{user.name}</UserName>
                     <UserStatus>
-                      <StatusDot isOnline={false} />
+                      <StatusDot $isOnline={false} />
                       Offline
                     </UserStatus>
                   </UserInfo>
@@ -673,11 +646,7 @@ const GlobalChat: React.FC<Props> = ({ onClose }) => {
 
   return (
     <>
-      <ChatToggleButton onClick={toggleChat} isOpen={isOpen}>
-        {isOpen ? '❯' : '❮'}
-      </ChatToggleButton>
-      
-      <ChatContainer isOpen={isOpen}>
+      <ChatContainer $isOpen={isOpen}>
         <ChatHeader>
           <ChatTitle>
             <div className="icon">💬</div>
@@ -694,13 +663,13 @@ const GlobalChat: React.FC<Props> = ({ onClose }) => {
         
         <ChatTabs>
           <ChatTab 
-            active={activeTab === 'chat'} 
+            $active={activeTab === 'chat'} 
             onClick={() => setActiveTab('chat')}
           >
             Chat
           </ChatTab>
           <ChatTab 
-            active={activeTab === 'users'} 
+            $active={activeTab === 'users'} 
             onClick={() => setActiveTab('users')}
           >
             Users
@@ -709,6 +678,12 @@ const GlobalChat: React.FC<Props> = ({ onClose }) => {
         
         {renderTabContent()}
       </ChatContainer>
+      <ChatToggleButton 
+        onClick={toggleChat}
+        $isOpen={isOpen}
+      >
+        {isOpen ? '→' : '←'}
+      </ChatToggleButton>
     </>
   );
 };
