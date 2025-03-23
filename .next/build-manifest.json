@@ -1,87 +1,41 @@
 {
   "polyfillFiles": [
-    "static/chunks/polyfills-42372ed130431b0a.js"
+    "static/chunks/polyfills.js"
   ],
-  "devFiles": [],
+  "devFiles": [
+    "static/chunks/react-refresh.js"
+  ],
   "ampDevFiles": [],
   "lowPriorityFiles": [
-    "static/b_FTsPQ7trnDJ_z5WvHjw/_buildManifest.js",
-    "static/b_FTsPQ7trnDJ_z5WvHjw/_ssgManifest.js"
+    "static/development/_buildManifest.js",
+    "static/development/_ssgManifest.js"
   ],
   "rootMainFiles": [],
   "pages": {
     "/": [
-      "static/chunks/webpack-4f82d8b609b5d170.js",
-      "static/chunks/framework-e952fed463eb8e34.js",
-      "static/chunks/main-004d0b982bbe3814.js",
-      "static/chunks/pages/index-95ac3d345d43d4a0.js"
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/index.js"
     ],
     "/_app": [
-      "static/chunks/webpack-4f82d8b609b5d170.js",
-      "static/chunks/framework-e952fed463eb8e34.js",
-      "static/chunks/main-004d0b982bbe3814.js",
-      "static/css/62b0c4fab9b00d38.css",
-      "static/chunks/pages/_app-f3727889d82d3c31.js"
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/_app.js"
     ],
     "/_error": [
-      "static/chunks/webpack-4f82d8b609b5d170.js",
-      "static/chunks/framework-e952fed463eb8e34.js",
-      "static/chunks/main-004d0b982bbe3814.js",
-      "static/chunks/pages/_error-10090a8ee211d5fd.js"
-    ],
-    "/about": [
-      "static/chunks/webpack-4f82d8b609b5d170.js",
-      "static/chunks/framework-e952fed463eb8e34.js",
-      "static/chunks/main-004d0b982bbe3814.js",
-      "static/chunks/pages/about-858ee1df2d30db87.js"
-    ],
-    "/contact": [
-      "static/chunks/webpack-4f82d8b609b5d170.js",
-      "static/chunks/framework-e952fed463eb8e34.js",
-      "static/chunks/main-004d0b982bbe3814.js",
-      "static/chunks/pages/contact-1108b08e7a8e8533.js"
-    ],
-    "/game/blackjack": [
-      "static/chunks/webpack-4f82d8b609b5d170.js",
-      "static/chunks/framework-e952fed463eb8e34.js",
-      "static/chunks/main-004d0b982bbe3814.js",
-      "static/chunks/pages/game/blackjack-1e924d3a9045960b.js"
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/_error.js"
     ],
     "/game/minesweeper": [
-      "static/chunks/webpack-4f82d8b609b5d170.js",
-      "static/chunks/framework-e952fed463eb8e34.js",
-      "static/chunks/main-004d0b982bbe3814.js",
-      "static/chunks/pages/game/minesweeper-288f68d5f70a8038.js"
-    ],
-    "/game/rock-paper-scissors": [
-      "static/chunks/webpack-4f82d8b609b5d170.js",
-      "static/chunks/framework-e952fed463eb8e34.js",
-      "static/chunks/main-004d0b982bbe3814.js",
-      "static/chunks/pages/game/rock-paper-scissors-ed5bd77a2e8f1016.js"
-    ],
-    "/games": [
-      "static/chunks/webpack-4f82d8b609b5d170.js",
-      "static/chunks/framework-e952fed463eb8e34.js",
-      "static/chunks/main-004d0b982bbe3814.js",
-      "static/chunks/pages/games-dee4c187088f1b33.js"
-    ],
-    "/help": [
-      "static/chunks/webpack-4f82d8b609b5d170.js",
-      "static/chunks/framework-e952fed463eb8e34.js",
-      "static/chunks/main-004d0b982bbe3814.js",
-      "static/chunks/pages/help-253309f9c34fecb4.js"
-    ],
-    "/settings": [
-      "static/chunks/webpack-4f82d8b609b5d170.js",
-      "static/chunks/framework-e952fed463eb8e34.js",
-      "static/chunks/main-004d0b982bbe3814.js",
-      "static/chunks/pages/settings-2dd7a995153a714f.js"
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/game/minesweeper.js"
     ],
     "/wallet": [
-      "static/chunks/webpack-4f82d8b609b5d170.js",
-      "static/chunks/framework-e952fed463eb8e34.js",
-      "static/chunks/main-004d0b982bbe3814.js",
-      "static/chunks/pages/wallet-28b71d569d977e53.js"
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/wallet.js"
     ]
   },
   "ampFirstPages": []

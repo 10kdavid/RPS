@@ -1,1 +1,8 @@
-{"/_app":"pages/_app.js","/_error":"pages/_error.js","/about":"pages/about.html","/game/blackjack":"pages/game/blackjack.html","/contact":"pages/contact.html","/games":"pages/games.html","/game/minesweeper":"pages/game/minesweeper.html","/":"pages/index.html","/game/rock-paper-scissors":"pages/game/rock-paper-scissors.html","/help":"pages/help.html","/settings":"pages/settings.html","/wallet":"pages/wallet.html","/_document":"pages/_document.js","/404":"pages/404.html"}
+{
+  "/_app": "pages/_app.js",
+  "/_error": "pages/_error.js",
+  "/_document": "pages/_document.js",
+  "/wallet": "pages/wallet.js",
+  "/": "pages/index.js",
+  "/game/minesweeper": "pages/game/minesweeper.js"
+}
