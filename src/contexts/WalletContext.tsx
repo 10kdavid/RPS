@@ -77,9 +77,21 @@ export const WalletContextProvider: React.FC<{ children: ReactNode }> = ({ child
   const refreshBalance = async (): Promise<void> => {
     if (wallet.publicKey && connection) {
       try {
-        const walletBalance = await connection.getBalance(wallet.publicKey);
-        setBalance(walletBalance / LAMPORTS_PER_SOL); // Convert lamports to SOL
-        console.log("Refreshed balance:", walletBalance / LAMPORTS_PER_SOL);
+        // Create a direct connection to Solana mainnet for this specific call
+        const directConnection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+        
+        // Try both connections to get balance
+        let walletBalance;
+        try {
+          walletBalance = await connection.getBalance(wallet.publicKey);
+        } catch (err) {
+          console.log("Primary connection failed, trying direct connection");
+          walletBalance = await directConnection.getBalance(wallet.publicKey);
+        }
+        
+        const solBalance = walletBalance / LAMPORTS_PER_SOL;
+        setBalance(solBalance);
+        console.log("Refreshed balance:", solBalance);
       } catch (error) {
         console.error('Error refreshing balance:', error);
       }
@@ -91,9 +103,21 @@ export const WalletContextProvider: React.FC<{ children: ReactNode }> = ({ child
     if (wallet.publicKey && connection) {
       const fetchBalance = async () => {
         try {
-          const walletBalance = await connection.getBalance(wallet.publicKey!);
-          setBalance(walletBalance / LAMPORTS_PER_SOL); // Convert lamports to SOL
-          console.log("Updated balance:", walletBalance / LAMPORTS_PER_SOL);
+          // Create a direct connection to Solana mainnet for this specific call
+          const directConnection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+          
+          // Try both connections to get balance
+          let walletBalance;
+          try {
+            walletBalance = await connection.getBalance(wallet.publicKey!);
+          } catch (err) {
+            console.log("Primary connection failed, trying direct connection");
+            walletBalance = await directConnection.getBalance(wallet.publicKey!);
+          }
+          
+          const solBalance = walletBalance / LAMPORTS_PER_SOL;
+          setBalance(solBalance);
+          console.log("Updated balance:", solBalance);
         } catch (error) {
           console.error('Error fetching balance:', error);
           setBalance(0);
@@ -131,14 +155,9 @@ export const WalletContextProvider: React.FC<{ children: ReactNode }> = ({ child
 
 // Wallet provider wrapper component
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Use more reliable Solana RPC endpoints
-  // First try a public RPC endpoint
-  const HELIUS_API_KEY = "54fd62a3-9fa7-4a61-a01a-27452a798977";
-  const network = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
+  // Use the most reliable public Solana RPC endpoint
+  const network = 'https://api.mainnet-beta.solana.com';
   
-  // Fallback to standard endpoint if needed
-  const fallbackNetwork = clusterApiUrl('mainnet-beta');
-
   // Define supported wallet adapters
   const wallets = [
     new PhantomWalletAdapter(),
