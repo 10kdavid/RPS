@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { useWallet } from '../../contexts/WalletContext';
 import Link from 'next/link';
 import AppSidebar from '../../components/Sidebar';
+import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 // Game States & Types
 enum GameState {
@@ -609,6 +610,88 @@ const MainContent = styled.div<SidebarProps>`
   min-height: 100vh;
 `;
 
+const GameLink = styled.div`
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  font-size: 0.8rem;
+  word-break: break-all;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const StatusMessage = styled.p`
+  color: #00eca4;
+  font-weight: bold;
+  margin-top: 10px;
+`;
+
+const ErrorMessage = styled.div`
+  color: #ff5252;
+  font-size: 0.85rem;
+  margin: 10px 0;
+  padding: 8px;
+  background-color: rgba(255, 82, 82, 0.1);
+  border-radius: 4px;
+  border-left: 3px solid #ff5252;
+`;
+
+const GameActivityPanel = styled.div`
+  margin-top: 20px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 15px;
+  max-height: 200px;
+  overflow-y: auto;
+`;
+
+const ActivityHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+`;
+
+const ActivityTitle = styled.h3`
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+`;
+
+const LastUpdated = styled.span`
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+`;
+
+const ActivityMessages = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+`;
+
+const EmptyActivity = styled.div`
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  padding: 20px 0;
+  font-style: italic;
+`;
+
+const ActivityMessage = styled.div`
+  display: flex;
+  gap: 8px;
+  font-size: 0.85rem;
+  padding: 5px 0;
+`;
+
+const ActivityTime = styled.span`
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.75rem;
+`;
+
+const ActivityText = styled.span`
+  color: white;
+`;
+
 const MinesweeperGame: React.FC = () => {
   const router = useRouter();
   const { connected, balance, publicKey, openWalletModal } = useWallet();
@@ -628,28 +711,26 @@ const MinesweeperGame: React.FC = () => {
   const [hasOpponent, setHasOpponent] = useState<boolean>(false);
   const [opponentName, setOpponentName] = useState<string>("Waiting for opponent...");
   const [gameLink, setGameLink] = useState<string>("");
+  const [gameId, setGameId] = useState<string | null>(null);
+  const [isCreator, setIsCreator] = useState<boolean>(false);
+  const [isOpponentReady, setIsOpponentReady] = useState<boolean>(false);
+  
+  // Add these new state variables for wagering
+  const [isWagerPending, setIsWagerPending] = useState<boolean>(false);
+  const [wagerSuccess, setWagerSuccess] = useState<boolean>(false);
+  const [wagerError, setWagerError] = useState<string | null>(null);
+  const [gameWinner, setGameWinner] = useState<string | null>(null);
+  
+  // Add these new state variables for real-time updates
+  const [gameMessages, setGameMessages] = useState<string[]>([]);
+  const [isOpponentOnline, setIsOpponentOnline] = useState<boolean>(false);
+  const [lastActionTime, setLastActionTime] = useState<string | null>(null);
   
   // Constants
   const GRID_SIZE = 5;
   const MINE_COUNT = 1; // Just one mine as requested
   const TOTAL_CELLS = GRID_SIZE * GRID_SIZE;
   const SAFE_CELLS = TOTAL_CELLS - MINE_COUNT;
-  
-  // Generate a unique game link for inviting opponents
-  const generateGameLink = () => {
-    const randomId = Math.random().toString(36).substring(2, 10);
-    const link = `${window.location.origin}/game/minesweeper?id=${randomId}`;
-    setGameLink(link);
-    return link;
-  };
-
-  // Copy game link to clipboard
-  const copyGameLink = () => {
-    if (gameLink) {
-      navigator.clipboard.writeText(gameLink);
-      alert("Game link copied to clipboard!");
-    }
-  };
   
   // Initialize grid
   const initializeGrid = (): Cell[][] => {
@@ -676,6 +757,57 @@ const MinesweeperGame: React.FC = () => {
     return newGrid;
   };
   
+  // Generate a unique game link for inviting opponents
+  const generateGameLink = () => {
+    if (!gameId) return "";
+    return `${window.location.origin}/game/minesweeper?id=${gameId}`;
+  };
+
+  // Copy game link to clipboard
+  const copyGameLink = () => {
+    if (gameLink) {
+      navigator.clipboard.writeText(gameLink);
+      alert("Game link copied to clipboard!");
+    }
+  };
+  
+  // Add useEffect to check for game ID in URL
+  useEffect(() => {
+    // Check if there's a game ID in the URL
+    const { id } = router.query;
+    if (id && typeof id === 'string') {
+      setGameId(id);
+      setIsCreator(false);
+      // When joining a game
+      if (connected) {
+        joinGame(id);
+      }
+    }
+  }, [router.query, connected]);
+
+  // Joining a game
+  const joinGame = (id: string) => {
+    if (!connected) {
+      openWalletModal();
+      return;
+    }
+    
+    setHasOpponent(true);
+    setOpponentName("Game Creator");
+    setIsOpponentReady(true);
+    
+    // In a real implementation, you would:
+    // 1. Connect to a WebSocket or use an SDK like Pusher, Socket.io, or Firebase
+    // 2. Notify the game creator that a player has joined
+    // 3. Set up real-time communication between players
+    
+    // For now, simulate joining
+    setTimeout(() => {
+      setGrid(initializeGrid());
+      setGameState(GameState.PLAYING);
+    }, 1000);
+  };
+  
   // Start game with a friend
   const handleCreateGame = () => {
     if (!connected) {
@@ -683,8 +815,17 @@ const MinesweeperGame: React.FC = () => {
       return;
     }
     
-    generateGameLink();
+    const randomId = Math.random().toString(36).substring(2, 10);
+    setGameId(randomId);
+    setIsCreator(true);
+    
+    const link = `${window.location.origin}/game/minesweeper?id=${randomId}`;
+    setGameLink(link);
     setGameState(GameState.WAITING);
+    
+    // In a real implementation, you would:
+    // 1. Create a game session on your backend
+    // 2. Set up a listener for when a player joins
   };
   
   // Start matchmaking
@@ -719,7 +860,78 @@ const MinesweeperGame: React.FC = () => {
     setRevealedThisTurn(0);
   };
   
-  // Handle cell click
+  // Add wagering functionality
+  const placeBet = async () => {
+    if (!connected || !publicKey) {
+      openWalletModal();
+      return;
+    }
+    
+    setIsWagerPending(true);
+    setWagerError(null);
+    
+    try {
+      // In a real implementation, you'd use an escrow contract
+      // For now, we'll just simulate the bet being placed
+      
+      // Check if the user has enough balance
+      if (balance < betAmount) {
+        throw new Error(`Insufficient balance. You need at least ${betAmount} SOL.`);
+      }
+      
+      // Simulate successful bet placement
+      setTimeout(() => {
+        setIsWagerPending(false);
+        setWagerSuccess(true);
+        // After successful bet, you can proceed with game creation
+        handleCreateGame();
+      }, 1500);
+      
+      // In a real implementation:
+      // 1. Create a transaction to send SOL to an escrow account
+      // 2. Sign and send the transaction
+      // 3. Store the escrow information
+    } catch (error) {
+      console.error('Error placing bet:', error);
+      setIsWagerPending(false);
+      setWagerError(error.message || 'Failed to place bet. Please try again.');
+    }
+  };
+  
+  // End game and pay the winner
+  const settleWager = (winner: string) => {
+    setGameWinner(winner);
+    
+    // In a real implementation:
+    // 1. Call your backend to release funds from escrow to the winner
+    // 2. Update game state
+    
+    // For now, just simulate the payout
+    setTimeout(() => {
+      alert(`Game over! ${winner} has won ${betAmount * 2} SOL!`);
+    }, 1000);
+  };
+  
+  // Override handleEndTurn to check win/lose conditions
+  const handleEndTurn = () => {
+    // Check if the player revealed enough cells to win
+    const safeRevealedCount = revealedCount;
+    
+    if (safeRevealedCount === SAFE_CELLS) {
+      // Player has revealed all safe cells and won
+      setGameState(GameState.WIN);
+      if (isMultiplayer) {
+        settleWager(playerTurn === PlayerTurn.PLAYER_ONE ? 'Player 1' : 'Player 2');
+      }
+      return;
+    }
+    
+    // Switch turns
+    setPlayerTurn(playerTurn === PlayerTurn.PLAYER_ONE ? PlayerTurn.PLAYER_TWO : PlayerTurn.PLAYER_ONE);
+    setRevealedThisTurn(0);
+  };
+  
+  // Override handleCellClick to handle game end conditions with wagering
   const handleCellClick = (row: number, col: number) => {
     if (gameState !== GameState.PLAYING || grid[row][col].revealed) return;
     
@@ -737,6 +949,13 @@ const MinesweeperGame: React.FC = () => {
       if (newGrid[row][col].hasMine) {
         setGrid([...newGrid]);
         setGameState(GameState.GAME_OVER);
+        
+        // If multiplayer, settle the wager
+        if (isMultiplayer) {
+          // Current player lost, so the other player wins
+          const winner = playerTurn === PlayerTurn.PLAYER_ONE ? 'Player 2' : 'Player 1';
+          settleWager(winner);
+        }
         return;
       }
       
@@ -757,14 +976,11 @@ const MinesweeperGame: React.FC = () => {
       // Check win condition
       if (revealedCount === TOTAL_CELLS - MINE_COUNT) {
         setGameState(GameState.WIN);
+        if (isMultiplayer) {
+          settleWager(playerTurn === PlayerTurn.PLAYER_ONE ? 'Player 1' : 'Player 2');
+        }
       }
     }, 300); // Half the animation duration
-  };
-  
-  // End turn
-  const handleEndTurn = () => {
-    setPlayerTurn(playerTurn === PlayerTurn.PLAYER_ONE ? PlayerTurn.PLAYER_TWO : PlayerTurn.PLAYER_ONE);
-    setRevealedThisTurn(0);
   };
   
   // Reset game
@@ -876,24 +1092,33 @@ const MinesweeperGame: React.FC = () => {
                 step="0.01" 
                 min="0.01" 
                 value={betAmount}
-                onChange={(e) => setBetAmount(e.target.value)}
+                onChange={(e) => setBetAmount(Number(e.target.value))}
               />
             </InputContainer>
             
             <ButtonsContainer>
-              <PercentButton onClick={() => setBetAmount('0.05')}>0.05</PercentButton>
-              <PercentButton onClick={() => setBetAmount('0.1')}>0.1</PercentButton>
-              <PercentButton onClick={() => setBetAmount('0.5')}>0.5</PercentButton>
-              <PercentButton onClick={() => setBetAmount('1')}>1</PercentButton>
+              <PercentButton onClick={() => setBetAmount(0.05)}>0.05</PercentButton>
+              <PercentButton onClick={() => setBetAmount(0.1)}>0.1</PercentButton>
+              <PercentButton onClick={() => setBetAmount(0.5)}>0.5</PercentButton>
+              <PercentButton onClick={() => setBetAmount(1)}>1</PercentButton>
             </ButtonsContainer>
+            
+            {wagerError && <ErrorMessage>{wagerError}</ErrorMessage>}
+            
+            <ActionButton 
+              onClick={placeBet} 
+              disabled={!connected || isWagerPending}
+            >
+              {isWagerPending ? 'Processing...' : 'Place Bet'}
+            </ActionButton>
           </BettingSection>
           
           <ActionsSection>
             <SectionTitle>Game Mode</SectionTitle>
-            <ActionButton onClick={handleCreateGame} disabled={!connected}>
+            <ActionButton onClick={handleCreateGame} disabled={!connected || !wagerSuccess}>
               Create Game
             </ActionButton>
-            <ActionButton onClick={handleMatchmaking} disabled={!connected}>
+            <ActionButton onClick={handleMatchmaking} disabled={!connected || !wagerSuccess}>
               Find Opponent
             </ActionButton>
             <SecondaryButton onClick={handleStartGame} disabled={!connected}>
@@ -920,6 +1145,8 @@ const MinesweeperGame: React.FC = () => {
             Current Bet: <span>{betAmount} SOL</span>
           </BetAmountDisplay>
           
+          <GameLink>{gameLink}</GameLink>
+          
           <ActionButton onClick={copyGameLink}>
             Copy Game Link
           </ActionButton>
@@ -931,6 +1158,9 @@ const MinesweeperGame: React.FC = () => {
           <GameInfo>
             <p>Waiting for an opponent to join...</p>
             <p>Share the game link with a friend to play together.</p>
+            {isOpponentReady && (
+              <StatusMessage>Opponent has joined! Game will start soon.</StatusMessage>
+            )}
           </GameInfo>
         </>
       );
@@ -1023,8 +1253,112 @@ const MinesweeperGame: React.FC = () => {
     }
   };
   
+  // Add function to update game messages
+  const addGameMessage = (message: string) => {
+    setGameMessages(prev => [...prev, message]);
+    setLastActionTime(new Date().toLocaleTimeString());
+  };
+  
+  // Simulate opponent joining
+  useEffect(() => {
+    if (gameState === GameState.WAITING && !hasOpponent) {
+      // Simulate random opponent joining after some time
+      const joinTimeout = setTimeout(() => {
+        if (gameState === GameState.WAITING) {
+          setHasOpponent(true);
+          setIsOpponentOnline(true);
+          setOpponentName("Random Opponent");
+          addGameMessage("Opponent has joined the game!");
+          
+          // Start the game after a small delay
+          setTimeout(() => {
+            setGrid(initializeGrid());
+            setGameState(GameState.PLAYING);
+            setIsMultiplayer(true);
+            addGameMessage("Game has started!");
+          }, 1500);
+        }
+      }, Math.random() * 10000 + 5000); // Random time between 5-15 seconds
+      
+      return () => clearTimeout(joinTimeout);
+    }
+  }, [gameState, hasOpponent]);
+  
+  // Simulate opponent moves when it's their turn
+  useEffect(() => {
+    if (gameState === GameState.PLAYING && 
+        isMultiplayer && 
+        hasOpponent && 
+        playerTurn === PlayerTurn.PLAYER_TWO) {
+      
+      addGameMessage("Opponent is thinking...");
+      
+      // Simulate opponent making moves
+      const moveTimeout = setTimeout(() => {
+        // Find all unrevealed cells
+        const unrevealedCells: {row: number, col: number}[] = [];
+        grid.forEach((row, rowIndex) => {
+          row.forEach((cell, colIndex) => {
+            if (!cell.revealed) {
+              unrevealedCells.push({row: rowIndex, col: colIndex});
+            }
+          });
+        });
+        
+        if (unrevealedCells.length > 0) {
+          // Pick a random unrevealed cell
+          const randomIndex = Math.floor(Math.random() * unrevealedCells.length);
+          const {row, col} = unrevealedCells[randomIndex];
+          
+          // Opponent clicks the cell
+          handleCellClick(row, col);
+          addGameMessage(`Opponent revealed tile (${row+1}, ${col+1})`);
+          
+          // If game isn't over and opponent hasn't hit a mine, possibly end turn
+          setTimeout(() => {
+            if (gameState === GameState.PLAYING && Math.random() > 0.3) {
+              handleEndTurn();
+              addGameMessage("Opponent ended their turn");
+            }
+          }, 1000);
+        }
+      }, Math.random() * 3000 + 2000); // Random time between 2-5 seconds
+      
+      return () => clearTimeout(moveTimeout);
+    }
+  }, [gameState, playerTurn, isMultiplayer, hasOpponent]);
+  
   const toggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
+  };
+  
+  // Add a component to display game messages/activity
+  const renderGameActivity = () => {
+    if (!isMultiplayer || gameState === GameState.INIT) {
+      return null;
+    }
+    
+    return (
+      <GameActivityPanel>
+        <ActivityHeader>
+          <ActivityTitle>Game Activity</ActivityTitle>
+          {lastActionTime && <LastUpdated>Last update: {lastActionTime}</LastUpdated>}
+        </ActivityHeader>
+        
+        <ActivityMessages>
+          {gameMessages.length === 0 ? (
+            <EmptyActivity>Waiting for game actions...</EmptyActivity>
+          ) : (
+            gameMessages.map((message, index) => (
+              <ActivityMessage key={index}>
+                <ActivityTime>{new Date().toLocaleTimeString()}</ActivityTime>
+                <ActivityText>{message}</ActivityText>
+              </ActivityMessage>
+            ))
+          )}
+        </ActivityMessages>
+      </GameActivityPanel>
+    );
   };
   
   return (
@@ -1071,6 +1405,8 @@ const MinesweeperGame: React.FC = () => {
                   ))
                 )}
               </GridContainer>
+              
+              {renderGameActivity()}
             </RightPanel>
           </GameContainer>
           

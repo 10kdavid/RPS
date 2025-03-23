@@ -27,20 +27,15 @@
       "static/chunks/main.js",
       "static/chunks/pages/_error.js"
     ],
-    "/game/blackjack": [
-      "static/chunks/webpack.js",
-      "static/chunks/main.js",
-      "static/chunks/pages/game/blackjack.js"
-    ],
     "/game/minesweeper": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",
       "static/chunks/pages/game/minesweeper.js"
     ],
-    "/games": [
+    "/game/rock-paper-scissors": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",
-      "static/chunks/pages/games.js"
+      "static/chunks/pages/game/rock-paper-scissors.js"
     ]
   },
   "ampFirstPages": []

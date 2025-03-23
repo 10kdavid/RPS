@@ -2,8 +2,7 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
+  "/game/minesweeper": "pages/game/minesweeper.js",
   "/": "pages/index.js",
-  "/games": "pages/games.js",
-  "/game/blackjack": "pages/game/blackjack.js",
-  "/game/minesweeper": "pages/game/minesweeper.js"
+  "/game/rock-paper-scissors": "pages/game/rock-paper-scissors.js"
 }
