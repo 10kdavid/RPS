@@ -10,9 +10,7 @@ import { clusterApiUrl, Connection } from '@solana/web3.js';
 import { 
   PhantomWalletAdapter, 
   SolflareWalletAdapter, 
-  TorusWalletAdapter,
-  BackpackWalletAdapter,
-  LedgerWalletAdapter
+  TorusWalletAdapter
 } from '@solana/wallet-adapter-wallets';
 import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 
@@ -145,8 +143,6 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const wallets = [
     new PhantomWalletAdapter(),
     new SolflareWalletAdapter(),
-    new BackpackWalletAdapter(),
-    new LedgerWalletAdapter(),
     new TorusWalletAdapter()
   ];
 
