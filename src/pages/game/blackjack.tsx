@@ -769,13 +769,8 @@ const BlackjackGame: React.FC = () => {
       setInviteCode(randomCode);
       setGameSessionId(gameId);
       
-      // Fix: Ensure we use the correct production URL without Vercel preview domains
-      const baseUrl = window.location.origin;
-      // Remove any Vercel preview URLs if present
-      const productionUrl = baseUrl.includes('vercel.app') 
-        ? 'https://rockpapersolana.com' // Replace with your actual domain
-        : baseUrl;
-      
+      // Always use the production domain for game links, not Vercel preview URLs
+      const productionUrl = "https://rockpapersolana.com";
       setGameLink(`${productionUrl}/game/blackjack?invite=${randomCode}`);
       
       // Set game state to waiting for opponent

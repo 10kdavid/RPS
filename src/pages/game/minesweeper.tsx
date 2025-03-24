@@ -714,13 +714,14 @@ const MinesweeperGame: React.FC = () => {
   const [movesCount, setMovesCount] = useState(0);
   const [revealedThisTurn, setRevealedThisTurn] = useState(0);
   const [betAmount, setBetAmount] = useState(0.1);
-  const [activeTab, setActiveTab] = useState('bet');
+  const [activeTab, setActiveTab] = useState('rules');
   const [isMultiplayer, setIsMultiplayer] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [hasOpponent, setHasOpponent] = useState<boolean>(false);
   const [opponentName, setOpponentName] = useState<string>("Waiting for opponent...");
   const [gameLink, setGameLink] = useState<string>("");
   const [gameId, setGameId] = useState<string | null>(null);
+  const [gameIdToJoin, setGameIdToJoin] = useState<string>("");
   const [isCreator, setIsCreator] = useState<boolean>(false);
   const [isOpponentReady, setIsOpponentReady] = useState<boolean>(false);
   
@@ -772,13 +773,8 @@ const MinesweeperGame: React.FC = () => {
   // Generate a unique game link for inviting opponents
   const generateGameLink = () => {
     if (gameId) {
-      // Fix: Ensure we use the correct production URL without Vercel preview domains
-      const baseUrl = window.location.origin;
-      // Remove any Vercel preview URLs if present
-      const productionUrl = baseUrl.includes('vercel.app') 
-        ? 'https://rockpapersolana.com' // Replace with your actual domain
-        : baseUrl;
-        
+      // Always use the production domain for game links, not Vercel preview URLs
+      const productionUrl = "https://rockpapersolana.com";
       setGameLink(`${productionUrl}/game/minesweeper?id=${gameId}`);
     }
   };
@@ -1435,47 +1431,45 @@ const MinesweeperGame: React.FC = () => {
     setLastActionTime(new Date().toLocaleTimeString());
   };
   
-  // Update useEffect to properly handle game links
+  // Handle direct game ID access from URL
   useEffect(() => {
     const handleGameId = async () => {
-      // Check if there's a game ID in the URL
-      const { id } = router.query;
-      console.log("Router query for minesweeper:", router.query);
-      
-      if (id && typeof id === 'string') {
-        console.log(`Detected game ID: ${id}`);
-        setGameId(id);
-        setIsCreator(false);
-        setIsMultiplayer(true);
+      if (router.isReady) {
+        // Check for game ID in URL
+        const { id } = router.query;
         
-        // When joining a game
-        if (connected && publicKey) {
-          console.log(`User connected with wallet ${publicKey}, joining game ${id}`);
-          try {
-            await joinGame(id);
-          } catch (error) {
-            console.error("Failed to join minesweeper game:", error);
-            alert(`Could not join game: ${error.message || "Unknown error"}`);
-            resetGame();
+        if (id && typeof id === 'string') {
+          console.log(`Game ID detected in URL: ${id}`);
+          
+          if (connected && publicKey) {
+            console.log(`User connected with wallet, attempting to join game: ${id}`);
+            try {
+              // Check if game exists first
+              const exists = await checkGameExists('minesweeper', id);
+              
+              if (exists) {
+                await joinGame(id);
+              } else {
+                console.error("Game not found or has expired");
+                setGameMessages([...gameMessages, "Game not found or has expired. Try creating a new game."]);
+                setGameState(GameState.INIT);
+              }
+            } catch (error) {
+              console.error("Error joining game:", error);
+              setGameMessages([...gameMessages, `Error joining game: ${error.message || "Unknown error"}`]);
+              setGameState(GameState.INIT);
+            }
+          } else {
+            console.log("Wallet not connected, prompting user");
+            setGameMessages([...gameMessages, "Please connect your wallet to join this game"]);
+            // Store game ID to join after wallet connects
+            setGameIdToJoin(id);
           }
-        } else {
-          console.log("Wallet not connected, prompting user to connect");
-          alert("Please connect your wallet to join this multiplayer game");
-          openWalletModal();
         }
       }
     };
     
-    if (router.isReady) {
-      handleGameId();
-    }
-    
-    return () => {
-      // Cleanup Firebase listener
-      if (unsubscribeRef) {
-        unsubscribeRef();
-      }
-    };
+    handleGameId();
   }, [router.isReady, router.query, connected, publicKey]);
   
   // Simulate opponent joining
@@ -1579,6 +1573,15 @@ const MinesweeperGame: React.FC = () => {
       </GameActivityPanel>
     );
   };
+  
+  // Check if wallet was connected and we need to join a game
+  useEffect(() => {
+    if (connected && publicKey && gameIdToJoin) {
+      console.log(`Wallet connected, joining saved game ID: ${gameIdToJoin}`);
+      joinGame(gameIdToJoin);
+      setGameIdToJoin(''); // Clear it after use
+    }
+  }, [connected, publicKey, gameIdToJoin]);
   
   return (
     <PageContainer>

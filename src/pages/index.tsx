@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -388,6 +388,20 @@ const HomePage = () => {
   const toggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
+  
+  // Redirect game links if needed
+  useEffect(() => {
+    // Check if there's a redirect in the URL (for handling game links)
+    const { redirect, invite, id } = router.query;
+    
+    if (redirect) {
+      if (redirect === 'blackjack' && invite) {
+        router.push(`/game/blackjack?invite=${invite}`);
+      } else if (redirect === 'minesweeper' && id) {
+        router.push(`/game/minesweeper?id=${id}`);
+      }
+    }
+  }, [router.query, router.isReady]);
   
   return (
     <>
