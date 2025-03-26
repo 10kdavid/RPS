@@ -19,6 +19,11 @@ export interface CrossmintWalletContextValue {
   getHistory: () => Promise<any[]>;
   isLoading: boolean;
   error: string | null;
+  // Add escrow functionality
+  createEscrowWallet: (gameId: string) => Promise<string>;
+  sendToEscrow: (gameId: string, escrowAddress: string, amount: number) => Promise<any>;
+  releaseEscrow: (gameId: string, escrowAddress: string, winnerAddress: string) => Promise<any>;
+  getEscrowBalance: (escrowAddress: string) => Promise<number>;
 }
 
 // Create context with default values
@@ -33,7 +38,12 @@ const CrossmintWalletContext = createContext<CrossmintWalletContextValue>({
   sendTransaction: async () => ({}),
   getHistory: async () => [],
   isLoading: false,
-  error: null
+  error: null,
+  // Add escrow defaults
+  createEscrowWallet: async () => '',
+  sendToEscrow: async () => ({}),
+  releaseEscrow: async () => ({}),
+  getEscrowBalance: async () => 0
 });
 
 // Create hook for using the wallet context
@@ -47,6 +57,8 @@ export const CrossmintWalletProvider: React.FC<{ children: ReactNode }> = ({ chi
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  // Map to keep track of escrow wallets
+  const [escrowWallets, setEscrowWallets] = useState<Record<string, string>>({});
 
   // Load wallet from local storage on mount
   useEffect(() => {
@@ -250,6 +262,169 @@ export const CrossmintWalletProvider: React.FC<{ children: ReactNode }> = ({ chi
     }
   }, [connected, walletAddress]);
 
+  // Create a new escrow wallet for a game
+  const createEscrowWallet = async (gameId: string): Promise<string> => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log(`Creating escrow wallet for game: ${gameId}`);
+      
+      // Check if we already have an escrow wallet for this game
+      if (escrowWallets[gameId]) {
+        console.log(`Escrow wallet for game ${gameId} already exists: ${escrowWallets[gameId]}`);
+        return escrowWallets[gameId];
+      }
+      
+      // Create a new wallet via Crossmint
+      const wallet = await createWallet();
+      console.log(`Escrow wallet created for game ${gameId}:`, wallet);
+      
+      if (!wallet || !wallet.address) {
+        throw new Error("Escrow wallet creation failed");
+      }
+      
+      // Store escrow wallet in state
+      setEscrowWallets(prev => ({
+        ...prev,
+        [gameId]: wallet.address
+      }));
+      
+      // Also store in localStorage for persistence
+      const storedEscrows = JSON.parse(localStorage.getItem('crossmint_escrows') || '{}');
+      storedEscrows[gameId] = wallet.address;
+      localStorage.setItem('crossmint_escrows', JSON.stringify(storedEscrows));
+      
+      return wallet.address;
+    } catch (error) {
+      console.error('Error creating escrow wallet:', error);
+      setError(`Failed to create escrow wallet: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Send funds to an escrow wallet
+  const sendToEscrow = async (gameId: string, escrowAddress: string, amount: number): Promise<any> => {
+    if (!walletAddress) throw new Error('Wallet not connected');
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log(`Sending ${amount} SOL to escrow wallet ${escrowAddress} for game ${gameId}`);
+      
+      // Send the transaction
+      const result = await createTransaction(walletAddress, escrowAddress, amount);
+      console.log(`Escrow funding result for game ${gameId}:`, result);
+      
+      // Refresh balance after sending
+      await refreshBalance();
+      
+      return result;
+    } catch (error) {
+      console.error('Error sending to escrow:', error);
+      setError(`Failed to send to escrow: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Release funds from escrow to winner
+  const releaseEscrow = async (gameId: string, escrowAddress: string, winnerAddress: string): Promise<any> => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log(`Releasing escrow for game ${gameId} from ${escrowAddress} to winner ${winnerAddress}`);
+      
+      // Get escrow wallet balance first
+      const balances = await getWalletBalance(escrowAddress);
+      const solBalance = balances.find(b => b.token.toLowerCase() === 'sol');
+      
+      if (!solBalance || parseFloat(solBalance.amount) <= 0) {
+        throw new Error("Escrow wallet has insufficient balance");
+      }
+      
+      // Send all funds to winner
+      const amount = parseFloat(solBalance.amount);
+      console.log(`Sending ${amount} SOL from escrow to winner`);
+      
+      // Use the escrow wallet's address directly to send from it to the winner
+      // Note: This requires server-side handling for security
+      const response = await fetch(`/api/crossmint/escrow/release`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          escrowAddress,
+          winnerAddress,
+          amount: amount.toString(),
+          gameId
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to release escrow: ${JSON.stringify(errorData)}`);
+      }
+      
+      const result = await response.json();
+      
+      // Remove escrow from state once released
+      setEscrowWallets(prev => {
+        const newState = { ...prev };
+        delete newState[gameId];
+        return newState;
+      });
+      
+      // Also remove from localStorage
+      const storedEscrows = JSON.parse(localStorage.getItem('crossmint_escrows') || '{}');
+      delete storedEscrows[gameId];
+      localStorage.setItem('crossmint_escrows', JSON.stringify(storedEscrows));
+      
+      return result;
+    } catch (error) {
+      console.error('Error releasing escrow:', error);
+      setError(`Failed to release escrow: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Get balance of escrow wallet
+  const getEscrowBalance = async (escrowAddress: string): Promise<number> => {
+    try {
+      console.log(`Getting balance for escrow wallet: ${escrowAddress}`);
+      const balances = await getWalletBalance(escrowAddress);
+      const solBalance = balances.find(b => b.token.toLowerCase() === 'sol');
+      
+      if (solBalance) {
+        const amount = parseFloat(solBalance.amount);
+        console.log(`Escrow wallet has ${amount} SOL`);
+        return amount;
+      }
+      
+      return 0;
+    } catch (error) {
+      console.error('Error getting escrow balance:', error);
+      return 0;
+    }
+  };
+
+  // Load escrow wallets from localStorage
+  useEffect(() => {
+    try {
+      const storedEscrows = JSON.parse(localStorage.getItem('crossmint_escrows') || '{}');
+      setEscrowWallets(storedEscrows);
+      console.log("Loaded escrow wallets from storage:", storedEscrows);
+    } catch (error) {
+      console.error("Error loading escrow wallets:", error);
+    }
+  }, []);
+
   // Create context value object
   const contextValue: CrossmintWalletContextValue = {
     balance,
@@ -262,7 +437,12 @@ export const CrossmintWalletProvider: React.FC<{ children: ReactNode }> = ({ chi
     sendTransaction,
     getHistory,
     isLoading,
-    error
+    error,
+    // Add escrow functions
+    createEscrowWallet,
+    sendToEscrow, 
+    releaseEscrow,
+    getEscrowBalance
   };
 
   return (

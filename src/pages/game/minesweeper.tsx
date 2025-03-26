@@ -3,6 +3,7 @@ import styled, { keyframes, css } from 'styled-components';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useWallet } from '../../contexts/WalletContext';
+import { useCrossmintWallet } from '../../contexts/CrossmintWalletContext';
 import Link from 'next/link';
 import AppSidebar from '../../components/Sidebar';
 import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
@@ -15,12 +16,32 @@ import {
 } from '../../utils/firebase';
 
 // Game States & Types
-enum GameState {
+enum GameStateEnum {
   INIT = 'INIT',
   WAITING = 'WAITING',
   PLAYING = 'PLAYING',
   GAME_OVER = 'GAME_OVER',
   WIN = 'WIN'
+}
+
+interface GameData {
+  grid?: Cell[][];
+  betAmount?: number; // Store bet amount in game data
+  escrowAddress?: string; // Store escrow wallet address
+  escrowFunded?: {
+    [playerId: string]: boolean; // Track who has funded the escrow
+  };
+  winner?: string;
+}
+
+interface GameState {
+  id: string;
+  creator: string;
+  opponent?: string;
+  status: 'waiting' | 'playing' | 'completed';
+  currentTurn?: string;
+  gameData?: GameData;
+  lastUpdated: number;
 }
 
 enum PlayerTurn {
@@ -311,41 +332,172 @@ const ActionsSection = styled.div`
 `;
 
 const GameInfo = styled.div`
-  margin-top: auto;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.6);
-`;
-
-const GameStat = styled.div`
   display: flex;
-  justify-content: space-between;
-  padding: 6px 0;
+  flex-direction: column;
+  gap: 15px;
+`;
+
+const GameInfoRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+`;
+
+const GameInfoLabel = styled.div`
+  color: rgba(255, 255, 255, 0.7);
   font-size: 0.9rem;
 `;
 
-const StatLabel = styled.span`
-  color: rgba(255, 255, 255, 0.6);
-`;
-
-const StatValue = styled.span`
-  color: white;
+const GameInfoValue = styled.div`
   font-weight: 500;
 `;
 
-const BetAmountDisplay = styled.div`
-  background: rgba(0, 236, 170, 0.1);
+const CopyButton = styled.button`
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  margin-left: auto;
+  
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+`;
+
+const OrText = styled.div`
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 15px 0;
+  position: relative;
+  
+  &:before, &:after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 40%;
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+  
+  &:before {
+    left: 0;
+  }
+  
+  &:after {
+    right: 0;
+  }
+`;
+
+const EscrowSection = styled.div`
+  background-color: rgba(0, 0, 0, 0.2);
   border-radius: 8px;
   padding: 12px;
-  margin-bottom: 15px;
-  color: rgba(255, 255, 255, 0.7);
+  margin-top: 10px;
+  
+  h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.8);
+  }
+`;
+
+const EscrowInfo = styled.div`
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  
+  > div {
+    flex: 1;
+  }
+`;
+
+const GameActivityContainer = styled.div`
+  margin-top: 20px;
+  
+  h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.8);
+  }
+`;
+
+const GameMessageList = styled.div`
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const GameMessage = styled.div`
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.8);
+`;
+
+const GameStatusBar = styled.div`
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+  font-size: 1.2rem;
+  font-weight: 500;
+`;
+
+interface PlayerTurnProps {
+  myTurn: boolean;
+}
+
+const PlayerTurnIndicator = styled.div<PlayerTurnProps>`
+  padding: 8px 16px;
+  border-radius: 20px;
+  background-color: ${props => props.myTurn ? 'rgba(0, 236, 170, 0.2)' : 'rgba(255, 99, 71, 0.2)'};
+  color: ${props => props.myTurn ? '#00ecaa' : '#ff6347'};
+  font-weight: 600;
+`;
+
+const OpponentSection = styled.div`
+  margin-bottom: 20px;
   text-align: center;
   
-  span {
-    font-weight: 600;
-    color: #00ecaa;
+  h4 {
+    margin-bottom: 5px;
+    color: rgba(255, 255, 255, 0.7);
   }
+`;
+
+const OpponentAddress = styled.div`
+  font-family: monospace;
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 0.9rem;
+`;
+
+const CellContent = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+`;
+
+const MineElement = styled.div`
+  animation: ${explosionAnimation} 0.5s ease-out;
+`;
+
+const GemElement = styled.div`
+  animation: ${glowAnimation} 2s infinite;
 `;
 
 const RightPanel = styled.div`
@@ -427,132 +579,6 @@ const CellButton = styled.button<CellProps>`
     transform: none;
     box-shadow: none;
   }
-`;
-
-const CellContent = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-`;
-
-const MineElement = styled.div`
-  font-size: 32px;
-  animation: ${explosionAnimation} 0.4s ease-in-out forwards;
-`;
-
-const GemElement = styled.div`
-  font-size: 32px;
-  color: #00ecaa;
-`;
-
-const PlayerTurnIndicator = styled.div`
-  padding: 12px;
-  background-color: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-  margin-bottom: 20px;
-  text-align: center;
-  font-weight: 500;
-  border-left: 3px solid #00ecaa;
-`;
-
-const OpponentSection = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-  padding: 15px;
-  background-color: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
-`;
-
-const Avatar = styled.div`
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: #0e1923;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  color: white;
-`;
-
-const PlayerInfo = styled.div`
-  flex: 1;
-`;
-
-const PlayerName = styled.div`
-  font-weight: 500;
-  margin-bottom: 3px;
-`;
-
-const PlayerStatus = styled.div`
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
-`;
-
-const GameOverBanner = styled.div<{isWin: boolean}>`
-  background: ${props => props.isWin ? 
-    'linear-gradient(120deg, rgba(0, 236, 170, 0.2), rgba(0, 163, 255, 0.2))' : 
-    'linear-gradient(120deg, rgba(255, 57, 79, 0.2), rgba(255, 119, 57, 0.2))'};
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 20px;
-  text-align: center;
-  
-  h3 {
-    margin: 0 0 10px 0;
-    color: ${props => props.isWin ? '#00ecaa' : '#ff394f'};
-    font-size: 1.5rem;
-  }
-  
-  p {
-    margin: 0;
-    color: rgba(255, 255, 255, 0.7);
-  }
-`;
-
-const BottomSection = styled.div`
-  background-color: #142438;
-  border-radius: 12px;
-  padding: 20px;
-  margin-top: 20px;
-`;
-
-const TabsContainer = styled.div`
-  display: flex;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  margin-bottom: 20px;
-`;
-
-interface TabProps {
-  active: boolean;
-}
-
-const Tab = styled.button<TabProps>`
-  padding: 12px 20px;
-  background: transparent;
-  border: none;
-  color: ${props => props.active ? 'white' : 'rgba(255, 255, 255, 0.6)'};
-  font-weight: ${props => props.active ? '600' : '400'};
-  border-bottom: 2px solid ${props => props.active ? '#00ecaa' : 'transparent'};
-  cursor: pointer;
-  transition: all 0.2s;
-  
-  &:hover {
-    color: white;
-  }
-`;
-
-const TabContent = styled.div`
-  padding: 10px 0;
 `;
 
 const GameInfoCard = styled.div`
@@ -660,14 +686,10 @@ interface SidebarProps {
   collapsed: boolean;
 }
 
-const MainContent = styled.div.withConfig({
-  shouldForwardProp: (prop) => prop !== 'collapsed',
-})<SidebarProps>`
-  margin-left: ${props => props.collapsed ? '60px' : '200px'};
+const MainContent = styled.div`
   padding: 20px;
-  transition: margin-left 0.3s ease-in-out;
-  width: calc(100% - ${props => props.collapsed ? '60px' : '200px'});
-  min-height: 100vh;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
 `;
 
 const GameLink = styled.div`
@@ -777,61 +799,147 @@ const ActivityText = styled.span`
   color: white;
 `;
 
+const EscrowStatusContainer = styled.div`
+  background-color: rgba(0, 236, 170, 0.1);
+  border: 1px solid rgba(0, 236, 170, 0.3);
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+`;
+
+const EscrowTitle = styled.div`
+  font-size: 1rem;
+  font-weight: 600;
+  color: #00ecaa;
+  margin-bottom: 10px;
+`;
+
+const EscrowBalance = styled.div`
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 15px;
+`;
+
+const EscrowPlayers = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 15px;
+`;
+
+interface PlayerStatusProps {
+  funded: boolean;
+}
+
+const EscrowPlayerStatus = styled.div<PlayerStatusProps>`
+  padding: 8px 12px;
+  background-color: ${props => props.funded ? 'rgba(0, 236, 170, 0.2)' : 'rgba(255, 255, 255, 0.05)'};
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: ${props => props.funded ? '#00ecaa' : 'white'};
+`;
+
+const TabsContainer = styled.div`
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+`;
+
+const Tab = styled.button<{ active: boolean }>`
+  background-color: ${props => props.active ? '#00ecaa' : 'rgba(255, 255, 255, 0.1)'};
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+  font-weight: 600;
+  color: ${props => props.active ? '#0e1923' : 'rgba(255, 255, 255, 0.6)'};
+  transition: all 0.2s;
+  
+  &:hover {
+    background-color: ${props => props.active ? '#00d69c' : 'rgba(255, 255, 255, 0.2)'};
+  }
+`;
+
+const BottomSection = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+`;
+
+// Minesweeper Game Component
 const MinesweeperGame: React.FC = () => {
   const router = useRouter();
-  const { connected, balance, publicKey, openWalletModal } = useWallet();
+  const { publicKey, connected } = useWallet();
+  const { connected: crossmintConnected, walletAddress: crossmintAddress } = useCrossmintWallet();
   
   // Game state
-  const [gameState, setGameState] = useState<GameState>(GameState.INIT);
-  const [playerTurn, setPlayerTurn] = useState<PlayerTurn>(PlayerTurn.PLAYER_ONE);
+  const [activeTab, setActiveTab] = useState<'create' | 'join' | 'matchmaking' | 'game' | 'bigWins' | 'luckyWins' | 'challenges' | 'description'>('create');
+  const [gameState, setGameState] = useState<GameStateEnum>(GameStateEnum.INIT);
+  const [currentTurn, setCurrentTurn] = useState<PlayerTurn>(PlayerTurn.PLAYER_ONE);
   const [grid, setGrid] = useState<Cell[][]>([]);
-  const [minesCount, setMinesCount] = useState(0);
-  const [revealedCount, setRevealedCount] = useState(0);
-  const [movesCount, setMovesCount] = useState(0);
-  const [revealedThisTurn, setRevealedThisTurn] = useState(0);
-  const [betAmount, setBetAmount] = useState(0.1);
-  const [activeTab, setActiveTab] = useState('rules');
-  const [isMultiplayer, setIsMultiplayer] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [hasOpponent, setHasOpponent] = useState<boolean>(false);
-  const [opponentName, setOpponentName] = useState<string>("Waiting for opponent...");
-  const [gameLink, setGameLink] = useState<string>("");
-  const [gameId, setGameId] = useState<string | null>(null);
-  const [gameIdToJoin, setGameIdToJoin] = useState<string>("");
-  const [isCreator, setIsCreator] = useState<boolean>(false);
-  const [isOpponentReady, setIsOpponentReady] = useState<boolean>(false);
-  
-  // Add these new state variables for wagering
-  const [isWagerPending, setIsWagerPending] = useState<boolean>(false);
-  const [wagerSuccess, setWagerSuccess] = useState<boolean>(false);
-  const [wagerError, setWagerError] = useState<string | null>(null);
-  const [gameWinner, setGameWinner] = useState<string | null>(null);
-  
-  // Add these new state variables for real-time updates
+  const [betAmount, setBetAmount] = useState<number>(0.1);
+  const [gameId, setGameId] = useState<string>('');
+  const [joinGameId, setJoinGameId] = useState<string>('');
   const [gameMessages, setGameMessages] = useState<string[]>([]);
-  const [isOpponentOnline, setIsOpponentOnline] = useState<boolean>(false);
-  const [lastActionTime, setLastActionTime] = useState<string | null>(null);
-  
-  // Add new state for Firebase
-  const [unsubscribeRef, setUnsubscribeRef] = useState<any>(null);
+  const [escrowAddress, setEscrowAddress] = useState<string>('');
+  const [escrowFunded, setEscrowFunded] = useState<{[key: string]: boolean}>({});
+  const [activeScreen, setActiveScreen] = useState<string>('start');
+  const [hasOpponent, setHasOpponent] = useState<boolean>(false);
+  const [opponentAddress, setOpponentAddress] = useState<string>('');
+  const [isMultiplayer, setIsMultiplayer] = useState<boolean>(true);
+  const [gameLink, setGameLink] = useState<string>('');
   
   // Constants
   const GRID_SIZE = 5;
-  const MINE_COUNT = 1; // Just one mine as requested
-  const TOTAL_CELLS = GRID_SIZE * GRID_SIZE;
-  const SAFE_CELLS = TOTAL_CELLS - MINE_COUNT;
-  
-  // Initialize grid
-  const initializeGrid = (): Cell[][] => {
-    const newGrid: Cell[][] = Array(GRID_SIZE).fill(null).map(() => 
-      Array(GRID_SIZE).fill(null).map(() => ({ 
-        hasMine: false, 
+  const MINE_COUNT = 5;
+
+  // Methods
+  const handleCellClick = (row: number, col: number) => {
+    // Placeholder implementation
+    console.log(`Clicked cell at row ${row}, col ${col}`);
+    
+    // Create a copy of the grid
+    const newGrid = [...grid];
+    
+    // Mark the cell as revealed
+    newGrid[row][col].revealed = true;
+    
+    // Check if the cell contains a mine
+    if (newGrid[row][col].hasMine) {
+      newGrid[row][col].isAnimating = true;
+      setGameState(GameStateEnum.GAME_OVER);
+      addGameMessage("Game over! You hit a mine.");
+    } else {
+      addGameMessage(`Revealed cell at (${row + 1}, ${col + 1})`);
+      
+      // Check if all non-mine cells are revealed
+      const flatGrid = newGrid.flat();
+      const allNonMinesRevealed = flatGrid
+        .filter(cell => !cell.hasMine)
+        .every(cell => cell.revealed);
+      
+      if (allNonMinesRevealed) {
+        setGameState(GameStateEnum.WIN);
+        addGameMessage("Congratulations! You've found all the gems!");
+      }
+    }
+    
+    // Update the grid
+    setGrid(newGrid);
+  };
+
+  const initializeGrid = () => {
+    // Create a 5x5 grid with no mines initially
+    let newGrid: Cell[][] = Array(GRID_SIZE).fill(null).map(() => 
+      Array(GRID_SIZE).fill(null).map(() => ({
+        hasMine: false,
         revealed: false,
         isAnimating: false
       }))
     );
     
-    // Place exactly 1 mine
+    // Place 5 mines randomly
     let minesPlaced = 0;
     while (minesPlaced < MINE_COUNT) {
       const row = Math.floor(Math.random() * GRID_SIZE);
@@ -845,956 +953,403 @@ const MinesweeperGame: React.FC = () => {
     
     return newGrid;
   };
-  
-  // Generate a unique game link for inviting opponents
-  const generateGameLink = () => {
+
+  const generateGameLink = (id: string) => {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${baseUrl}/game/minesweeper?id=${id}`;
+  };
+
+  const copyGameLink = async () => {
     if (gameId) {
-      // Always use the production domain for game links, not Vercel preview URLs
-      const productionUrl = "https://rockpapersolana.com";
-      setGameLink(`${productionUrl}/game/minesweeper?id=${gameId}`);
+      const link = generateGameLink(gameId);
+      await navigator.clipboard.writeText(link);
+      addGameMessage("Game link copied to clipboard");
     }
   };
 
-  // Copy game link to clipboard
-  const copyGameLink = async () => {
-    if (!gameLink) return;
-    
-    try {
-      await navigator.clipboard.writeText(gameLink);
-      // Use a more modern approach instead of alert
-      const messagesCopy = [...gameMessages];
-      messagesCopy.push("Game link copied to clipboard!");
-      setGameMessages(messagesCopy);
-      
-      // Visual feedback for copy
-      const linkElement = document.querySelector('.game-link');
-      if (linkElement) {
-        linkElement.classList.add('copied');
-        setTimeout(() => {
-          linkElement.classList.remove('copied');
-        }, 1000);
-      }
-    } catch (error) {
-      console.error("Failed to copy:", error);
-      // Fallback method
-      const textarea = document.createElement('textarea');
-      textarea.value = gameLink;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-      
-      const messagesCopy = [...gameMessages];
-      messagesCopy.push("Game link copied to clipboard!");
-      setGameMessages(messagesCopy);
-    }
-  };
-  
-  // Joining a game
-  const joinGame = async (id: string) => {
-    if (!connected || !publicKey) {
-      alert("Please connect your wallet to join this game");
-      openWalletModal();
-      return;
-    }
-    
-    console.log(`Attempting to join minesweeper game: ${id}`);
-    
-    try {
-      // Check if game exists first
-      const exists = await checkGameExists('minesweeper', id);
-      if (!exists) {
-        throw new Error("Game not found or has expired");
-      }
-      
-      // Join the game in Firebase
-      await joinGameSession('minesweeper', id, publicKey.toString());
-      
-      setHasOpponent(true);
-      setOpponentName("Game Creator");
-      setIsOpponentReady(true);
-      
-      // Listen for game updates
-      const unsubscribe = listenToGameUpdates('minesweeper', id, (gameData) => {
-        console.log('Minesweeper game update received:', gameData);
-        
-        // Update game state based on creator's actions
-        if (gameData.status === 'playing') {
-          if (gameState !== GameState.PLAYING) {
-            setGameState(GameState.PLAYING);
-            // Initialize grid from creator's data or create new one
-            if (gameData.gameData && gameData.gameData.grid) {
-              setGrid(gameData.gameData.grid);
-            } else {
-              setGrid(initializeGrid());
-            }
-          }
-          
-          // Update who's turn it is
-          if (gameData.currentTurn === publicKey.toString()) {
-            setPlayerTurn(PlayerTurn.PLAYER_TWO);
-            addGameMessage("Your turn!");
-          } else {
-            setPlayerTurn(PlayerTurn.PLAYER_ONE);
-            addGameMessage("Opponent's turn");
-          }
-          
-          // Update grid if changed by opponent
-          if (gameData.gameData && gameData.gameData.grid) {
-            setGrid(gameData.gameData.grid);
-            setRevealedCount(gameData.gameData.revealedCount || 0);
-          }
-          
-          // Check game end conditions
-          if (gameData.gameData && gameData.gameData.gameState) {
-            setGameState(gameData.gameData.gameState);
-            if (gameData.gameData.gameState === GameState.GAME_OVER || gameData.gameData.gameState === GameState.WIN) {
-              setGameWinner(gameData.gameData.winner || null);
-            }
-          }
-        }
-      });
-      
-      setUnsubscribeRef(() => unsubscribe);
-      console.log("Successfully joined minesweeper game and established connection");
-      
-    } catch (error) {
-      console.error("Error joining minesweeper game:", error);
-      throw error;
-    }
-  };
-  
-  // Start game with a friend
   const handleCreateGame = async () => {
-    if (!connected || !publicKey) {
-      openWalletModal();
-      return;
-    }
+    setGameMessages([]);
     
-    try {
-      // Create a game session in Firebase
-      const gameId = await createGameSession('minesweeper', publicKey.toString());
-      setGameId(gameId);
-      setIsCreator(true);
-      
-      const link = `${window.location.origin}/game/minesweeper?id=${gameId}`;
-      setGameLink(link);
-      setGameState(GameState.WAITING);
-      
-      // Initialize grid
-      const initialGrid = initializeGrid();
-      setGrid(initialGrid);
-      
-      // Listen for opponent joining
-      const unsubscribe = listenToGameUpdates('minesweeper', gameId, (gameData) => {
-        console.log('Game update:', gameData);
-        
-        // Check if opponent joined
-        if (gameData.status === 'playing' && gameData.opponent) {
-          setHasOpponent(true);
-          setOpponentName("Opponent");
-          setIsOpponentReady(true);
-          
-          if (gameState === GameState.WAITING) {
-            setGameState(GameState.PLAYING);
-            addGameMessage("Game has started!");
-          }
-          
-          // Update who's turn it is
-          if (gameData.currentTurn === publicKey.toString()) {
-            setPlayerTurn(PlayerTurn.PLAYER_ONE);
-            addGameMessage("Your turn!");
-          } else {
-            setPlayerTurn(PlayerTurn.PLAYER_TWO);
-            addGameMessage("Opponent's turn");
-          }
-          
-          // Update grid if changed by opponent
-          if (gameData.gameData && gameData.gameData.grid) {
-            setGrid(gameData.gameData.grid);
-            setRevealedCount(gameData.gameData.revealedCount || 0);
-          }
-          
-          // Check game end conditions
-          if (gameData.gameData && gameData.gameData.gameState) {
-            setGameState(gameData.gameData.gameState);
-            if (gameData.gameData.gameState === GameState.GAME_OVER || gameData.gameData.gameState === GameState.WIN) {
-              setGameWinner(gameData.gameData.winner || null);
-            }
-          }
-        }
-      });
-      
-      setUnsubscribeRef(() => unsubscribe);
-      
-      // Update game data in Firebase
-      await updateGameState('minesweeper', gameId, {
-        gameData: {
-          grid: initialGrid,
-          revealedCount: 0,
-          gameState: GameState.WAITING
-        }
-      });
-      
-      addGameMessage("Waiting for opponent to join...");
-      
-    } catch (error) {
-      console.error('Error creating game:', error);
-      alert('Failed to create game. Please try again.');
-    }
+    // Create a new game session
+    const newGameId = Math.random().toString(36).substring(2, 10);
+    setGameId(newGameId);
+    setGameLink(generateGameLink(newGameId));
+    
+    const newGrid = initializeGrid();
+    setGrid(newGrid);
+    
+    // Set player as creator
+    setHasOpponent(false);
+    setGameState(GameStateEnum.WAITING);
+    setActiveScreen('game');
+    
+    addGameMessage("Game created! Waiting for opponent. Share the link to invite someone.");
   };
-  
-  // Start matchmaking
-  const handleMatchmaking = () => {
-    if (!connected) {
-      openWalletModal();
+
+  const joinGame = async (id: string) => {
+    if (!id) {
+      alert("Please enter a game ID");
       return;
     }
     
-    // Simulate finding a random opponent
-    setGameState(GameState.WAITING);
+    setGameMessages([]);
     
+    // Set game info
+    setGameId(id);
+    setGameState(GameStateEnum.WAITING);
+    setActiveScreen('game');
+    setHasOpponent(true);
+    setOpponentAddress("DEMO_OPPONENT_ADDRESS");
+    
+    // Initialize the grid
+    const newGrid = initializeGrid();
+    setGrid(newGrid);
+    
+    addGameMessage("Joined game! Waiting for opponent to start.");
+    
+    // Start game
     setTimeout(() => {
-      setHasOpponent(true);
-      setOpponentName("Random Player");
-      setGameState(GameState.PLAYING);
-      setGrid(initializeGrid());
+      setGameState(GameStateEnum.PLAYING);
+      addGameMessage("Game started! Your turn.");
     }, 2000);
   };
-  
-  // Start a local game
-  const handleStartGame = () => {
-    if (!connected) {
-      openWalletModal();
-      return;
-    }
-    
-    setGrid(initializeGrid());
-    setGameState(GameState.PLAYING);
-    setPlayerTurn(PlayerTurn.PLAYER_ONE);
-    setRevealedCount(0);
-    setRevealedThisTurn(0);
-  };
-  
-  // Add wagering functionality
-  const placeBet = async () => {
-    if (!connected || !publicKey) {
-      openWalletModal();
-      return;
-    }
-    
-    setIsWagerPending(true);
-    setWagerError(null);
-    
-    try {
-      // In a real implementation, you'd use an escrow contract
-      // For now, we'll just simulate the bet being placed
-      
-      // Check if the user has enough balance
-      if (balance < betAmount) {
-        throw new Error(`Insufficient balance. You need at least ${betAmount} SOL.`);
-      }
-      
-      // Simulate successful bet placement
-      setTimeout(() => {
-        setIsWagerPending(false);
-        setWagerSuccess(true);
-        // After successful bet, you can proceed with game creation
-        handleCreateGame();
-      }, 1500);
-      
-      // In a real implementation:
-      // 1. Create a transaction to send SOL to an escrow account
-      // 2. Sign and send the transaction
-      // 3. Store the escrow information
-    } catch (error) {
-      console.error('Error placing bet:', error);
-      setIsWagerPending(false);
-      setWagerError(error.message || 'Failed to place bet. Please try again.');
-    }
-  };
-  
-  // End game and pay the winner
-  const settleWager = (winner: string) => {
-    setGameWinner(winner);
-    
-    // In a real implementation:
-    // 1. Call your backend to release funds from escrow to the winner
-    // 2. Update game state
-    
-    // For now, just simulate the payout
-    setTimeout(() => {
-      alert(`Game over! ${winner} has won ${betAmount * 2} SOL!`);
-    }, 1000);
-  };
-  
-  // Override handleEndTurn to check win/lose conditions
-  const handleEndTurn = () => {
-    // Check if the player revealed enough cells to win
-    const safeRevealedCount = revealedCount;
-    
-    if (safeRevealedCount === SAFE_CELLS) {
-      // Player has revealed all safe cells and won
-      setGameState(GameState.WIN);
-      if (isMultiplayer) {
-        settleWager(playerTurn === PlayerTurn.PLAYER_ONE ? 'Player 1' : 'Player 2');
-      }
-      return;
-    }
-    
-    // Switch turns
-    setPlayerTurn(playerTurn === PlayerTurn.PLAYER_ONE ? PlayerTurn.PLAYER_TWO : PlayerTurn.PLAYER_ONE);
-    setRevealedThisTurn(0);
-  };
-  
-  // Override handleCellClick to update Firebase
-  const handleCellClick = async (row: number, col: number) => {
-    if (gameState !== GameState.PLAYING || grid[row][col].revealed) return;
-    
-    // Check if it's player's turn in multiplayer
-    if (isMultiplayer && 
-        ((isCreator && playerTurn !== PlayerTurn.PLAYER_ONE) || 
-         (!isCreator && playerTurn !== PlayerTurn.PLAYER_TWO))) {
-      addGameMessage("Not your turn!");
-      return;
-    }
-    
-    // Log the click event
-    console.log(`Cell clicked: row=${row}, col=${col}`);
-    addGameMessage(`Revealing tile at position (${row+1},${col+1})`);
-    
-    const newGrid = JSON.parse(JSON.stringify(grid)); // Deep clone to avoid state mutation issues
-    
-    // Start animation
-    newGrid[row][col].isAnimating = true;
-    setGrid([...newGrid]);
 
-    // Use setTimeout to allow animation to complete before showing result
-    setTimeout(async () => {
-      newGrid[row][col].revealed = true;
+  const fundEscrow = async (gameId: string, address: string, amount: number) => {
+    try {
+      console.log(`Funding escrow ${address} with ${amount} SOL for game ${gameId}`);
       
-      // Check if mine was hit
-      if (newGrid[row][col].hasMine) {
-        console.log(`Mine hit at row=${row}, col=${col}`);
-        addGameMessage("💥 Mine hit! Game over.");
+      if (crossmintAddress) {
+        // Use Crossmint wallet for transaction
+        const { sendToEscrow } = useCrossmintWallet();
         
-        setGrid([...newGrid]);
-        setGameState(GameState.GAME_OVER);
-        
-        // If multiplayer, settle the wager and update Firebase
-        if (isMultiplayer && gameId) {
-          // Current player lost, so the other player wins
-          const winner = playerTurn === PlayerTurn.PLAYER_ONE ? 'Player 2' : 'Player 1';
-          setGameWinner(winner);
-          
-          // Update game state in Firebase
-          try {
-            await updateGameState('minesweeper', gameId, {
-              gameData: {
-                grid: newGrid,
-                gameState: GameState.GAME_OVER,
-                winner: winner,
-                lastMove: { row, col }
-              }
-            });
-            console.log("Game state updated after mine hit");
-          } catch (error) {
-            console.error("Error updating game state after mine hit:", error);
-          }
-          
-          if (betAmount > 0) {
-            settleWager(winner);
-          }
+        if (!crossmintConnected) {
+          addGameMessage("⚠️ Crossmint wallet not connected. Please connect your wallet.");
+          return false;
         }
-        return;
-      }
-      
-      // No mine, just reveal cell
-      console.log(`Safe cell revealed at row=${row}, col=${col}`);
-      addGameMessage(`💎 Safe tile revealed!`);
-      
-      setGrid([...newGrid]);
-      setRevealedThisTurn(revealedThisTurn + 1);
-      setMovesCount(movesCount + 1);
-      
-      // Count revealed cells
-      let revealedCount = 0;
-      for (let r = 0; r < GRID_SIZE; r++) {
-        for (let c = 0; c < GRID_SIZE; c++) {
-          if (newGrid[r][c].revealed) revealedCount++;
-        }
-      }
-      setRevealedCount(revealedCount);
-      
-      // Check win condition
-      if (revealedCount === TOTAL_CELLS - MINE_COUNT) {
-        console.log("All safe cells revealed - player wins!");
-        addGameMessage("🏆 Victory! All safe tiles revealed!");
         
-        setGameState(GameState.WIN);
+        // Send funds to escrow using the Crossmint API
+        const result = await sendToEscrow(gameId, address, amount);
         
-        if (isMultiplayer && gameId) {
-          const winner = playerTurn === PlayerTurn.PLAYER_ONE ? 'Player 1' : 'Player 2';
-          setGameWinner(winner);
+        if (result) {
+          console.log("Transaction successful:", result);
           
-          // Update game state in Firebase
-          try {
-            await updateGameState('minesweeper', gameId, {
-              gameData: {
-                grid: newGrid,
-                revealedCount: revealedCount,
-                gameState: GameState.WIN,
-                winner: winner,
-                lastMove: { row, col }
-              }
-            });
-            console.log("Game state updated after win");
-          } catch (error) {
-            console.error("Error updating game state after win:", error);
-          }
+          // Update local state
+          const newEscrowFunded = { ...escrowFunded };
+          newEscrowFunded[crossmintAddress] = true;
+          setEscrowFunded(newEscrowFunded);
           
-          if (betAmount > 0) {
-            settleWager(winner);
-          }
-        }
-      } else if (isMultiplayer && gameId) {
-        // Update game state in Firebase for regular move
-        const nextTurn = playerTurn === PlayerTurn.PLAYER_ONE ? 
-          PlayerTurn.PLAYER_TWO : PlayerTurn.PLAYER_ONE;
-        
-        try {
+          // Update game data in Firebase to reflect funding
           await updateGameState('minesweeper', gameId, {
-            currentTurn: isCreator ? 
-              (nextTurn === PlayerTurn.PLAYER_ONE ? publicKey?.toString() : '') : 
-              (nextTurn === PlayerTurn.PLAYER_TWO ? publicKey?.toString() : ''),
             gameData: {
-              grid: newGrid,
-              revealedCount: revealedCount,
-              lastMove: { row, col }
+              escrowFunded: {
+                [crossmintAddress]: true
+              }
             }
           });
-          console.log("Game state updated after move");
-        } catch (error) {
-          console.error("Error updating game state after move:", error);
+          
+          addGameMessage(`✅ Escrow funded with ${amount} SOL successfully!`);
+          return true;
+        } else {
+          throw new Error("Transaction failed");
         }
+      } else if (publicKey) {
+        // For native Solana wallet, we need to implement the escrow functionality
+        // This would require a full solana program for secure escrow
         
-        // Switch turns
-        setPlayerTurn(nextTurn);
-        addGameMessage(nextTurn === (isCreator ? PlayerTurn.PLAYER_ONE : PlayerTurn.PLAYER_TWO) ? 
-          "Your turn!" : "Opponent's turn");
+        addGameMessage("⚠️ Native Solana wallet escrow not implemented yet. Please use Crossmint wallet.");
+        return false;
+      } else {
+        addGameMessage("⚠️ No wallet connected. Please connect a wallet to play.");
+        return false;
       }
-    }, 300); // Half the animation duration
-  };
-  
-  // Reset game
-  const resetGame = () => {
-    setGameState(GameState.INIT);
-    setPlayerTurn(PlayerTurn.PLAYER_ONE);
-    setGrid([]);
-    setRevealedCount(0);
-    setRevealedThisTurn(0);
-    setHasOpponent(false);
-    setOpponentName("Waiting for opponent...");
-    setGameLink("");
-  };
-  
-  // Render grid cell
-  const renderCell = (cell: Cell, row: number, col: number) => {
-    return (
-      <CellButton 
-        key={`${row}-${col}`} 
-        revealed={cell.revealed} 
-        hasMine={cell.hasMine} 
-        isAnimating={cell.isAnimating}
-        onClick={() => handleCellClick(row, col)}
-        disabled={gameState !== GameState.PLAYING || cell.revealed}
-      >
-        <CellContent>
-          {cell.revealed && (
-            cell.hasMine ? (
-              <MineElement>💣</MineElement>
-            ) : (
-              <GemElement>💎</GemElement>
-            )
-          )}
-        </CellContent>
-      </CellButton>
-    );
-  };
-  
-  // Render game status
-  const renderGameStatus = () => {
-    if (gameState === GameState.INIT) {
-      return null;
-    }
-    
-    if (gameState === GameState.WAITING) {
-      return (
-        <PlayerTurnIndicator>
-          Waiting for an opponent to join...
-        </PlayerTurnIndicator>
-      );
-    }
-    
-    if (gameState === GameState.GAME_OVER) {
-      return (
-        <GameOverBanner isWin={false}>
-          <h3>Game Over!</h3>
-          <p>{playerTurn === PlayerTurn.PLAYER_ONE ? 'Player 1' : 'Player 2'} hit a mine and lost!</p>
-        </GameOverBanner>
-      );
-    }
-    
-    if (gameState === GameState.WIN) {
-      return (
-        <GameOverBanner isWin={true}>
-          <h3>Victory!</h3>
-          <p>{playerTurn === PlayerTurn.PLAYER_ONE ? 'Player 1' : 'Player 2'} cleared all tiles and won!</p>
-        </GameOverBanner>
-      );
-    }
-    
-    return (
-      <PlayerTurnIndicator>
-        {playerTurn === PlayerTurn.PLAYER_ONE ? 'Player 1' : 'Player 2'}'s Turn
-      </PlayerTurnIndicator>
-    );
-  };
-  
-  // Render opponent information
-  const renderOpponentInfo = () => {
-    if (gameState === GameState.PLAYING && hasOpponent) {
-      return (
-        <OpponentSection>
-          <Avatar>
-            {opponentName.charAt(0).toUpperCase()}
-          </Avatar>
-          <PlayerInfo>
-            <PlayerName>{opponentName}</PlayerName>
-            <PlayerStatus>Online</PlayerStatus>
-          </PlayerInfo>
-        </OpponentSection>
-      );
-    }
-    return null;
-  };
-  
-  // Render left panel content
-  const renderLeftPanelContent = () => {
-    if (gameState === GameState.INIT) {
-      return (
-        <>
-          <SectionTitle>Place Your Bet</SectionTitle>
-          
-          <BettingSection>
-            <InputLabel>Bet Amount (SOL)</InputLabel>
-            <InputContainer>
-              <CurrencyIcon>Ⓢ</CurrencyIcon>
-              <AmountInput 
-                type="number" 
-                step="0.01" 
-                min="0.01" 
-                value={betAmount}
-                onChange={(e) => setBetAmount(Number(e.target.value))}
-              />
-            </InputContainer>
-            
-            <ButtonsContainer>
-              <PercentButton onClick={() => setBetAmount(0.05)}>0.05</PercentButton>
-              <PercentButton onClick={() => setBetAmount(0.1)}>0.1</PercentButton>
-              <PercentButton onClick={() => setBetAmount(0.5)}>0.5</PercentButton>
-              <PercentButton onClick={() => setBetAmount(1)}>1</PercentButton>
-            </ButtonsContainer>
-            
-            {wagerError && <ErrorMessage>{wagerError}</ErrorMessage>}
-            
-            <ActionButton 
-              onClick={placeBet} 
-              disabled={!connected || isWagerPending}
-            >
-              {isWagerPending ? 'Processing...' : 'Place Bet'}
-            </ActionButton>
-          </BettingSection>
-          
-          <ActionsSection>
-            <SectionTitle>Game Mode</SectionTitle>
-            <ActionButton onClick={handleCreateGame} disabled={!connected || !wagerSuccess}>
-              Create Game
-            </ActionButton>
-            <ActionButton onClick={handleMatchmaking} disabled={!connected || !wagerSuccess}>
-              Find Opponent
-            </ActionButton>
-            <SecondaryButton onClick={handleStartGame} disabled={!connected}>
-              Play Solo
-            </SecondaryButton>
-          </ActionsSection>
-          
-          <GameInfo>
-            <p>Mine has one hidden bomb. Take turns revealing tiles, but don't hit the bomb or you lose!</p>
-            <p>• Strategically choose which tiles to reveal</p>
-            <p>• Pass the turn to your opponent when you want</p>
-            <p>• Win by avoiding the mine and revealing all safe tiles</p>
-          </GameInfo>
-        </>
-      );
-    }
-    
-    if (gameState === GameState.WAITING) {
-      return (
-        <>
-          <SectionTitle>Game Created</SectionTitle>
-          
-          <BetAmountDisplay>
-            Current Bet: <span>{betAmount} SOL</span>
-          </BetAmountDisplay>
-          
-          <GameLink className="game-link">{gameLink}</GameLink>
-          
-          <ActionButton onClick={copyGameLink} type="button">
-            Copy Game Link
-          </ActionButton>
-          
-          <SecondaryButton onClick={resetGame}>
-            Cancel Game
-          </SecondaryButton>
-          
-          <GameInfo>
-            <p>Waiting for an opponent to join...</p>
-            <p>Share the game link with a friend to play together.</p>
-            {isOpponentReady && (
-              <StatusMessage>Opponent has joined! Game will start soon.</StatusMessage>
-            )}
-          </GameInfo>
-        </>
-      );
-    }
-    
-    return (
-      <>
-        <SectionTitle>Game Info</SectionTitle>
-        
-        <BetAmountDisplay>
-          Current Bet: <span>{betAmount} SOL</span>
-        </BetAmountDisplay>
-        
-        {gameState === GameState.PLAYING && (
-          <ActionButton onClick={handleEndTurn} disabled={revealedThisTurn === 0}>
-            End Turn
-          </ActionButton>
-        )}
-        
-        {(gameState === GameState.GAME_OVER || gameState === GameState.WIN) && (
-          <ActionButton onClick={resetGame}>
-            Play Again
-          </ActionButton>
-        )}
-        
-        <GameInfo>
-          <GameStat>
-            <StatLabel>Game State:</StatLabel>
-            <StatValue>{gameState}</StatValue>
-          </GameStat>
-          <GameStat>
-            <StatLabel>Current Turn:</StatLabel>
-            <StatValue>{playerTurn === PlayerTurn.PLAYER_ONE ? 'Player 1' : 'Player 2'}</StatValue>
-          </GameStat>
-          <GameStat>
-            <StatLabel>Moves Made:</StatLabel>
-            <StatValue>{movesCount}</StatValue>
-          </GameStat>
-          <GameStat>
-            <StatLabel>Tiles Revealed:</StatLabel>
-            <StatValue>{revealedCount} / {TOTAL_CELLS}</StatValue>
-          </GameStat>
-          <GameStat>
-            <StatLabel>Safe Tiles:</StatLabel>
-            <StatValue>{SAFE_CELLS}</StatValue>
-          </GameStat>
-        </GameInfo>
-      </>
-    );
-  };
-  
-  // Render tab content
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'bigWins':
-        return (
-          <TabContent>
-            <p>No big wins recorded yet.</p>
-          </TabContent>
-        );
-      case 'luckyWins':
-        return (
-          <TabContent>
-            <p>No lucky wins recorded yet.</p>
-          </TabContent>
-        );
-      case 'challenges':
-        return (
-          <TabContent>
-            <p>No challenges available at the moment.</p>
-          </TabContent>
-        );
-      case 'description':
-      default:
-        return (
-          <TabContent>
-            <GameInfoCard>
-              <GameInfoImage>
-                💎
-              </GameInfoImage>
-              <GameInfoContent>
-                <GameInfoTitle>Mines | Rock Paper Solana Originals</GameInfoTitle>
-                <GameInfoDescription>
-                  Join in on the Mines fever with one of our most popular and beloved games! Inspired by the classic Minesweeper, Mines will simply reveal the gems and avoid the bombs to increase your wins!
-                </GameInfoDescription>
-              </GameInfoContent>
-            </GameInfoCard>
-          </TabContent>
-        );
+    } catch (error) {
+      console.error("Error funding escrow:", error);
+      addGameMessage(`⚠️ Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return false;
     }
   };
-  
-  // Add function to update game messages
+
   const addGameMessage = (message: string) => {
     setGameMessages(prev => [...prev, message]);
-    setLastActionTime(new Date().toLocaleTimeString());
   };
-  
-  // Handle direct game ID access from URL
+
+  // Effect to handle game ID from URL on page load
   useEffect(() => {
-    const handleGameId = async () => {
-      if (router.isReady) {
-        // Check for game ID in URL
-        const { id } = router.query;
-        
-        if (id && typeof id === 'string') {
-          console.log(`Game ID detected in URL: ${id}`);
-          
-          if (connected && publicKey) {
-            console.log(`User connected with wallet, attempting to join game: ${id}`);
-            try {
-              // Check if game exists first
-              const exists = await checkGameExists('minesweeper', id);
-              
-              if (exists) {
-                await joinGame(id);
-              } else {
-                console.error("Game not found or has expired");
-                setGameMessages([...gameMessages, "Game not found or has expired. Try creating a new game."]);
-                setGameState(GameState.INIT);
-              }
-            } catch (error) {
-              console.error("Error joining game:", error);
-              setGameMessages([...gameMessages, `Error joining game: ${error.message || "Unknown error"}`]);
-              setGameState(GameState.INIT);
-            }
-          } else {
-            console.log("Wallet not connected, prompting user");
-            setGameMessages([...gameMessages, "Please connect your wallet to join this game"]);
-            // Store game ID to join after wallet connects
-            setGameIdToJoin(id);
-          }
-        }
-      }
-    };
-    
-    handleGameId();
-  }, [router.isReady, router.query, connected, publicKey]);
-  
-  // Simulate opponent joining
-  useEffect(() => {
-    if (gameState === GameState.WAITING && !hasOpponent) {
-      // Simulate random opponent joining after some time
-      const joinTimeout = setTimeout(() => {
-        if (gameState === GameState.WAITING) {
-          setHasOpponent(true);
-          setIsOpponentOnline(true);
-          setOpponentName("Random Opponent");
-          addGameMessage("Opponent has joined the game!");
-          
-          // Start the game after a small delay
-          setTimeout(() => {
-            setGrid(initializeGrid());
-            setGameState(GameState.PLAYING);
-            setIsMultiplayer(true);
-            addGameMessage("Game has started!");
-          }, 1500);
-        }
-      }, Math.random() * 10000 + 5000); // Random time between 5-15 seconds
-      
-      return () => clearTimeout(joinTimeout);
+    const { id } = router.query;
+    if (id && typeof id === 'string') {
+      setJoinGameId(id);
+      // Auto-join if ID is provided
+      joinGame(id);
+    } else {
+      // Initialize the grid for a new game
+      setGrid(initializeGrid());
     }
-  }, [gameState, hasOpponent]);
-  
-  // Simulate opponent moves when it's their turn
-  useEffect(() => {
-    if (gameState === GameState.PLAYING && 
-        isMultiplayer && 
-        hasOpponent && 
-        playerTurn === PlayerTurn.PLAYER_TWO) {
-      
-      addGameMessage("Opponent is thinking...");
-      
-      // Simulate opponent making moves
-      const moveTimeout = setTimeout(() => {
-        // Find all unrevealed cells
-        const unrevealedCells: {row: number, col: number}[] = [];
-        grid.forEach((row, rowIndex) => {
-          row.forEach((cell, colIndex) => {
-            if (!cell.revealed) {
-              unrevealedCells.push({row: rowIndex, col: colIndex});
-            }
-          });
-        });
-        
-        if (unrevealedCells.length > 0) {
-          // Pick a random unrevealed cell
-          const randomIndex = Math.floor(Math.random() * unrevealedCells.length);
-          const {row, col} = unrevealedCells[randomIndex];
-          
-          // Opponent clicks the cell
-          handleCellClick(row, col);
-          addGameMessage(`Opponent revealed tile (${row+1}, ${col+1})`);
-          
-          // If game isn't over and opponent hasn't hit a mine, possibly end turn
-          setTimeout(() => {
-            if (gameState === GameState.PLAYING && Math.random() > 0.3) {
-              handleEndTurn();
-              addGameMessage("Opponent ended their turn");
-            }
-          }, 1000);
-        }
-      }, Math.random() * 3000 + 2000); // Random time between 2-5 seconds
-      
-      return () => clearTimeout(moveTimeout);
-    }
-  }, [gameState, playerTurn, isMultiplayer, hasOpponent]);
-  
-  const toggleSidebar = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
-  };
-  
-  // Add a component to display game messages/activity
-  const renderGameActivity = () => {
-    if (!isMultiplayer || gameState === GameState.INIT) {
-      return null;
-    }
-    
-    return (
-      <GameActivityPanel>
-        <ActivityHeader>
-          <ActivityTitle>Game Activity</ActivityTitle>
-          {lastActionTime && <LastUpdated>Last update: {lastActionTime}</LastUpdated>}
-        </ActivityHeader>
-        
-        <ActivityMessages>
-          {gameMessages.length === 0 ? (
-            <EmptyActivity>Waiting for game actions...</EmptyActivity>
-          ) : (
-            gameMessages.map((message, index) => (
-              <ActivityMessage key={index}>
-                <ActivityTime>{new Date().toLocaleTimeString()}</ActivityTime>
-                <ActivityText>{message}</ActivityText>
-              </ActivityMessage>
-            ))
-          )}
-        </ActivityMessages>
-      </GameActivityPanel>
-    );
-  };
-  
-  // Check if wallet was connected and we need to join a game
-  useEffect(() => {
-    if (connected && publicKey && gameIdToJoin) {
-      console.log(`Wallet connected, joining saved game ID: ${gameIdToJoin}`);
-      joinGame(gameIdToJoin);
-      setGameIdToJoin(''); // Clear it after use
-    }
-  }, [connected, publicKey, gameIdToJoin]);
-  
+  }, [router.query]);
+
+  // Start the app
   return (
     <PageContainer>
       <Head>
-        <title>Mines | Rock Paper Solana</title>
-        <meta name="description" content="Play Mines on Solana blockchain and win SOL tokens. Strategic mining game with fluid animations." />
+        <title>Minesweeper | Rock Paper Solana</title>
       </Head>
-      
       <AppSidebar 
-        collapsed={sidebarCollapsed}
+        collapsed={false}
         currentPage="minesweeper"
-        toggleSidebar={toggleSidebar}
+        toggleSidebar={() => {}}
       />
-      
-      <MainContent collapsed={sidebarCollapsed}>
-        <GameWrapper>
-          <GameContainer>
-            <LeftPanel>
-              {renderLeftPanelContent()}
-            </LeftPanel>
-            
-            <RightPanel>
-              {renderGameStatus()}
-              {renderOpponentInfo()}
-              
-              <GridContainer>
-                {grid.length > 0 ? (
-                  grid.flat().map((cell, index) => {
-                    const row = Math.floor(index / GRID_SIZE);
-                    const col = index % GRID_SIZE;
-                    return renderCell(cell, row, col);
-                  })
-                ) : (
-                  Array(GRID_SIZE * GRID_SIZE).fill(null).map((_, index) => (
-                    <CellButton 
-                      key={index}
-                      revealed={false}
-                      isAnimating={false}
-                      disabled={true}
+      <GameWrapper>
+        <GameContainer>
+          <LeftPanel>
+            {gameState === GameStateEnum.INIT && (
+              <>
+                <h2>Minesweeper</h2>
+                <p>Find all the gems without hitting any mines!</p>
+                
+                <AmountContainer>
+                  <InputLabel>Bet Amount (SOL)</InputLabel>
+                  <InputContainer>
+                    <CurrencyIcon>◎</CurrencyIcon>
+                    <AmountInput 
+                      type="number" 
+                      value={betAmount}
+                      onChange={(e) => setBetAmount(parseFloat(e.target.value))}
+                      step={0.01}
+                      min={0.01}
+                      max={10}
+                    />
+                  </InputContainer>
+                  <ButtonsContainer>
+                    <PercentButton onClick={() => setBetAmount(0.1)}>0.1</PercentButton>
+                    <PercentButton onClick={() => setBetAmount(0.5)}>0.5</PercentButton>
+                    <PercentButton onClick={() => setBetAmount(1)}>1.0</PercentButton>
+                    <PercentButton onClick={() => setBetAmount(2)}>2.0</PercentButton>
+                  </ButtonsContainer>
+                </AmountContainer>
+                
+                <MinesContainer>
+                  <InputLabel>Game Mode</InputLabel>
+                  <SelectButton>
+                    Classic Mode (5 mines)
+                  </SelectButton>
+                </MinesContainer>
+                
+                {isMultiplayer ? (
+                  <>
+                    <ActionButton onClick={handleCreateGame}>
+                      Create Game
+                    </ActionButton>
+                    
+                    <OrText>OR</OrText>
+                    
+                    <InputLabel>Join Existing Game</InputLabel>
+                    <InputContainer>
+                      <AmountInput 
+                        type="text" 
+                        placeholder="Enter game ID" 
+                        value={joinGameId}
+                        onChange={(e) => setJoinGameId(e.target.value)}
+                      />
+                    </InputContainer>
+                    <ActionButton 
+                      onClick={() => joinGame(joinGameId)} 
+                      style={{ marginTop: '10px', backgroundColor: '#2a4365' }}
                     >
-                      <CellContent />
-                    </CellButton>
-                  ))
+                      Join Game
+                    </ActionButton>
+                  </>
+                ) : (
+                  <ActionButton onClick={() => {
+                    setGrid(initializeGrid());
+                    setGameState(GameStateEnum.PLAYING);
+                    setActiveScreen('game');
+                  }}>
+                    Start Game
+                  </ActionButton>
                 )}
-              </GridContainer>
-              
-              {renderGameActivity()}
-            </RightPanel>
-          </GameContainer>
-          
-          <BottomSection>
-            <TabsContainer>
-              <Tab 
-                active={activeTab === 'bigWins'} 
-                onClick={() => setActiveTab('bigWins')}
-              >
-                Big Wins
-              </Tab>
-              <Tab 
-                active={activeTab === 'luckyWins'} 
-                onClick={() => setActiveTab('luckyWins')}
-              >
-                Lucky Wins
-              </Tab>
-              <Tab 
-                active={activeTab === 'challenges'} 
-                onClick={() => setActiveTab('challenges')}
-              >
-                Challenges
-              </Tab>
-              <Tab 
-                active={activeTab === 'description'} 
-                onClick={() => setActiveTab('description')}
-              >
-                Description
-              </Tab>
-            </TabsContainer>
+              </>
+            )}
             
-            {renderTabContent()}
-          </BottomSection>
-        </GameWrapper>
-      </MainContent>
+            {gameState !== GameStateEnum.INIT && (
+              <>
+                <GameInfo>
+                  <h3>Game Info</h3>
+                  {gameId && (
+                    <GameInfoRow>
+                      <GameInfoLabel>Game ID:</GameInfoLabel>
+                      <GameInfoValue>{gameId}</GameInfoValue>
+                      <CopyButton onClick={copyGameLink}>
+                        Copy Link
+                      </CopyButton>
+                    </GameInfoRow>
+                  )}
+                  
+                  <GameInfoRow>
+                    <GameInfoLabel>Bet Amount:</GameInfoLabel>
+                    <GameInfoValue>◎ {betAmount}</GameInfoValue>
+                  </GameInfoRow>
+                  
+                  {isMultiplayer && escrowAddress && (
+                    <EscrowSection>
+                      <h4>Escrow Status</h4>
+                      <EscrowInfo>
+                        <div>
+                          <div>You:</div>
+                          <EscrowPlayerStatus funded={escrowFunded[publicKey || crossmintAddress] || false}>
+                            {escrowFunded[publicKey || crossmintAddress] ? 'Funded ✓' : 'Not Funded'}
+                          </EscrowPlayerStatus>
+                        </div>
+                        
+                        {hasOpponent && (
+                          <div>
+                            <div>Opponent:</div>
+                            <EscrowPlayerStatus funded={escrowFunded[opponentAddress] || false}>
+                              {escrowFunded[opponentAddress] ? 'Funded ✓' : 'Not Funded'}
+                            </EscrowPlayerStatus>
+                          </div>
+                        )}
+                      </EscrowInfo>
+                      
+                      {!escrowFunded[publicKey || crossmintAddress] && (
+                        <ActionButton 
+                          onClick={() => escrowAddress && fundEscrow(gameId, escrowAddress, betAmount)}
+                          style={{ marginTop: '10px' }}
+                        >
+                          Fund Escrow
+                        </ActionButton>
+                      )}
+                    </EscrowSection>
+                  )}
+                  
+                  {gameMessages.length > 0 && (
+                    <GameActivityContainer>
+                      <h4>Game Activity</h4>
+                      <GameMessageList>
+                        {gameMessages.map((message, index) => (
+                          <GameMessage key={index}>{message}</GameMessage>
+                        ))}
+                      </GameMessageList>
+                    </GameActivityContainer>
+                  )}
+                </GameInfo>
+              </>
+            )}
+          </LeftPanel>
+            
+          <RightPanel>
+            {gameState === GameStateEnum.INIT ? (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                <h3>Create or join a game to get started</h3>
+              </div>
+            ) : gameState === GameStateEnum.WAITING ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                <h2>Waiting for opponent to join...</h2>
+                <p>Share your game ID with a friend to play together!</p>
+                <div style={{ margin: '30px 0' }}>
+                  <div className="loader"></div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <GameStatusBar>
+                  {gameState === GameStateEnum.PLAYING && (
+                    <PlayerTurnIndicator myTurn={currentTurn === PlayerTurn.PLAYER_ONE}>
+                      {currentTurn === PlayerTurn.PLAYER_ONE ? 'Your turn' : 'Opponent\'s turn'}
+                    </PlayerTurnIndicator>
+                  )}
+                  
+                  {gameState === GameStateEnum.GAME_OVER && (
+                    <div style={{ color: '#ff4757' }}>Game Over! You hit a mine.</div>
+                  )}
+                  
+                  {gameState === GameStateEnum.WIN && (
+                    <div style={{ color: '#00ecaa' }}>Congratulations! You won!</div>
+                  )}
+                </GameStatusBar>
+                
+                {hasOpponent && (
+                  <OpponentSection>
+                    <h4>Playing against:</h4>
+                    <OpponentAddress>{opponentAddress.substring(0, 8)}...{opponentAddress.substring(opponentAddress.length - 8)}</OpponentAddress>
+                  </OpponentSection>
+                )}
+
+                <GridContainer>
+                  {grid.map((row, rowIndex) => (
+                    row.map((cell, colIndex) => (
+                      <CellButton
+                        key={`${rowIndex}-${colIndex}`}
+                        revealed={cell.revealed}
+                        hasMine={cell.hasMine}
+                        isAnimating={cell.isAnimating}
+                        onClick={() => handleCellClick(rowIndex, colIndex)}
+                        disabled={gameState !== GameStateEnum.PLAYING || cell.revealed}
+                      >
+                        <CellContent>
+                          {cell.revealed && cell.hasMine && (
+                            <MineElement>💣</MineElement>
+                          )}
+                          {cell.revealed && !cell.hasMine && (
+                            <GemElement>💎</GemElement>
+                          )}
+                        </CellContent>
+                      </CellButton>
+                    ))
+                  ))}
+                </GridContainer>
+              </>
+            )}
+          </RightPanel>
+        </GameContainer>
+        
+        <BottomSection>
+          <TabsContainer>
+            <Tab active={activeTab === 'create'} onClick={() => setActiveTab('create')}>Create Game</Tab>
+            <Tab active={activeTab === 'join'} onClick={() => setActiveTab('join')}>Join Game</Tab>
+            <Tab active={activeTab === 'matchmaking'} onClick={() => setActiveTab('matchmaking')}>Matchmaking</Tab>
+            <Tab active={activeTab === 'game'} onClick={() => setActiveTab('game')}>Game</Tab>
+            <Tab active={activeTab === 'bigWins'} onClick={() => setActiveTab('bigWins')}>Big Wins</Tab>
+            <Tab active={activeTab === 'luckyWins'} onClick={() => setActiveTab('luckyWins')}>Lucky Wins</Tab>
+            <Tab active={activeTab === 'challenges'} onClick={() => setActiveTab('challenges')}>Challenges</Tab>
+            <Tab active={activeTab === 'description'} onClick={() => setActiveTab('description')}>Description</Tab>
+          </TabsContainer>
+          
+          <MainContent>
+            {activeTab === 'bigWins' && (
+              <div>
+                <h3>Biggest Wins</h3>
+                <p>Top players with the biggest wins will be displayed here.</p>
+              </div>
+            )}
+            
+            {activeTab === 'luckyWins' && (
+              <div>
+                <h3>Luckiest Wins</h3>
+                <p>Most unlikely wins will be displayed here.</p>
+              </div>
+            )}
+            
+            {activeTab === 'challenges' && (
+              <div>
+                <h3>Challenges</h3>
+                <p>Complete challenges to earn rewards:</p>
+                <ul>
+                  <li>Win 5 games in a row</li>
+                  <li>Find all gems with only 1 reveal left</li>
+                  <li>Win against a player with 100+ wins</li>
+                </ul>
+              </div>
+            )}
+            
+            {activeTab === 'description' && (
+              <div>
+                <h3>How to Play Minesweeper</h3>
+                <p>The goal is to reveal all cells without mines. Click on cells to reveal what's underneath. If you reveal a mine, you lose!</p>
+                <p>In multiplayer mode, players take turns revealing cells. The first player to hit a mine loses, and the opponent wins the bet amount.</p>
+              </div>
+            )}
+          </MainContent>
+        </BottomSection>
+      </GameWrapper>
     </PageContainer>
   );
 };
