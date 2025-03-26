@@ -233,16 +233,56 @@ const ActionButton = styled.button`
   cursor: pointer;
   transition: all 0.2s ease;
   margin-bottom: 12px;
+  position: relative;
+  overflow: hidden;
   
   &:hover {
     background-color: #00d69c;
     transform: translateY(-2px);
   }
   
+  &:active {
+    transform: translateY(0);
+  }
+  
   &:disabled {
     background-color: rgba(0, 236, 170, 0.3);
     cursor: not-allowed;
     transform: none;
+  }
+  
+  /* Ripple effect */
+  &:after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.5);
+    opacity: 0;
+    border-radius: 100%;
+    transform: scale(1, 1) translate(-50%);
+    transform-origin: 50% 50%;
+  }
+
+  &:focus:not(:active)::after {
+    animation: ripple 1s ease-out;
+  }
+
+  @keyframes ripple {
+    0% {
+      transform: scale(0, 0);
+      opacity: 0.5;
+    }
+    20% {
+      transform: scale(25, 25);
+      opacity: 0.3;
+    }
+    100% {
+      opacity: 0;
+      transform: scale(40, 40);
+    }
   }
 `;
 
@@ -347,10 +387,11 @@ const CellButton = styled.button<CellProps>`
     : 'rgba(255, 255, 255, 0.05)'};
   display: flex;
   position: relative;
-  cursor: pointer;
+  cursor: ${props => props.revealed ? 'default' : 'pointer'};
   transition: all 0.15s ease;
   perspective: 1000px;
   transform-style: preserve-3d;
+  outline: none;
   
   ${props => props.isAnimating && css`
     animation: ${flipAnimation} 0.4s ease-out forwards;
@@ -368,6 +409,16 @@ const CellButton = styled.button<CellProps>`
     transform: ${props => !props.revealed && 'translateY(-2px)'};
     box-shadow: ${props => !props.revealed && '0 6px 12px rgba(0, 0, 0, 0.2)'};
     border-color: rgba(255, 255, 255, 0.2);
+  }
+  
+  &:focus {
+    outline: none;
+    border-color: ${props => !props.revealed && 'rgba(0, 236, 170, 0.5)'};
+  }
+  
+  &:active {
+    transform: ${props => !props.revealed && 'translateY(0)'};
+    box-shadow: none;
   }
   
   &:disabled {
@@ -627,6 +678,31 @@ const GameLink = styled.div`
   font-size: 0.8rem;
   word-break: break-all;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  transition: all 0.3s ease;
+  
+  &.copied {
+    background-color: rgba(34, 197, 94, 0.2);
+    border-color: rgba(34, 197, 94, 0.5);
+  }
+  
+  &:after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(34, 197, 94, 0.2);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+    border-radius: 4px;
+  }
+  
+  &.copied:after {
+    opacity: 1;
+  }
 `;
 
 const StatusMessage = styled.p`
@@ -780,10 +856,37 @@ const MinesweeperGame: React.FC = () => {
   };
 
   // Copy game link to clipboard
-  const copyGameLink = () => {
-    if (gameLink) {
-      navigator.clipboard.writeText(gameLink);
-      alert("Game link copied to clipboard!");
+  const copyGameLink = async () => {
+    if (!gameLink) return;
+    
+    try {
+      await navigator.clipboard.writeText(gameLink);
+      // Use a more modern approach instead of alert
+      const messagesCopy = [...gameMessages];
+      messagesCopy.push("Game link copied to clipboard!");
+      setGameMessages(messagesCopy);
+      
+      // Visual feedback for copy
+      const linkElement = document.querySelector('.game-link');
+      if (linkElement) {
+        linkElement.classList.add('copied');
+        setTimeout(() => {
+          linkElement.classList.remove('copied');
+        }, 1000);
+      }
+    } catch (error) {
+      console.error("Failed to copy:", error);
+      // Fallback method
+      const textarea = document.createElement('textarea');
+      textarea.value = gameLink;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      
+      const messagesCopy = [...gameMessages];
+      messagesCopy.push("Game link copied to clipboard!");
+      setGameMessages(messagesCopy);
     }
   };
   
@@ -1056,7 +1159,11 @@ const MinesweeperGame: React.FC = () => {
       return;
     }
     
-    const newGrid = [...grid];
+    // Log the click event
+    console.log(`Cell clicked: row=${row}, col=${col}`);
+    addGameMessage(`Revealing tile at position (${row+1},${col+1})`);
+    
+    const newGrid = JSON.parse(JSON.stringify(grid)); // Deep clone to avoid state mutation issues
     
     // Start animation
     newGrid[row][col].isAnimating = true;
@@ -1068,6 +1175,9 @@ const MinesweeperGame: React.FC = () => {
       
       // Check if mine was hit
       if (newGrid[row][col].hasMine) {
+        console.log(`Mine hit at row=${row}, col=${col}`);
+        addGameMessage("💥 Mine hit! Game over.");
+        
         setGrid([...newGrid]);
         setGameState(GameState.GAME_OVER);
         
@@ -1078,14 +1188,19 @@ const MinesweeperGame: React.FC = () => {
           setGameWinner(winner);
           
           // Update game state in Firebase
-          await updateGameState('minesweeper', gameId, {
-            gameData: {
-              grid: newGrid,
-              gameState: GameState.GAME_OVER,
-              winner: winner,
-              lastMove: { row, col }
-            }
-          });
+          try {
+            await updateGameState('minesweeper', gameId, {
+              gameData: {
+                grid: newGrid,
+                gameState: GameState.GAME_OVER,
+                winner: winner,
+                lastMove: { row, col }
+              }
+            });
+            console.log("Game state updated after mine hit");
+          } catch (error) {
+            console.error("Error updating game state after mine hit:", error);
+          }
           
           if (betAmount > 0) {
             settleWager(winner);
@@ -1095,6 +1210,9 @@ const MinesweeperGame: React.FC = () => {
       }
       
       // No mine, just reveal cell
+      console.log(`Safe cell revealed at row=${row}, col=${col}`);
+      addGameMessage(`💎 Safe tile revealed!`);
+      
       setGrid([...newGrid]);
       setRevealedThisTurn(revealedThisTurn + 1);
       setMovesCount(movesCount + 1);
@@ -1110,6 +1228,9 @@ const MinesweeperGame: React.FC = () => {
       
       // Check win condition
       if (revealedCount === TOTAL_CELLS - MINE_COUNT) {
+        console.log("All safe cells revealed - player wins!");
+        addGameMessage("🏆 Victory! All safe tiles revealed!");
+        
         setGameState(GameState.WIN);
         
         if (isMultiplayer && gameId) {
@@ -1117,15 +1238,20 @@ const MinesweeperGame: React.FC = () => {
           setGameWinner(winner);
           
           // Update game state in Firebase
-          await updateGameState('minesweeper', gameId, {
-            gameData: {
-              grid: newGrid,
-              revealedCount: revealedCount,
-              gameState: GameState.WIN,
-              winner: winner,
-              lastMove: { row, col }
-            }
-          });
+          try {
+            await updateGameState('minesweeper', gameId, {
+              gameData: {
+                grid: newGrid,
+                revealedCount: revealedCount,
+                gameState: GameState.WIN,
+                winner: winner,
+                lastMove: { row, col }
+              }
+            });
+            console.log("Game state updated after win");
+          } catch (error) {
+            console.error("Error updating game state after win:", error);
+          }
           
           if (betAmount > 0) {
             settleWager(winner);
@@ -1136,16 +1262,21 @@ const MinesweeperGame: React.FC = () => {
         const nextTurn = playerTurn === PlayerTurn.PLAYER_ONE ? 
           PlayerTurn.PLAYER_TWO : PlayerTurn.PLAYER_ONE;
         
-        await updateGameState('minesweeper', gameId, {
-          currentTurn: isCreator ? 
-            (nextTurn === PlayerTurn.PLAYER_ONE ? publicKey?.toString() : '') : 
-            (nextTurn === PlayerTurn.PLAYER_TWO ? publicKey?.toString() : ''),
-          gameData: {
-            grid: newGrid,
-            revealedCount: revealedCount,
-            lastMove: { row, col }
-          }
-        });
+        try {
+          await updateGameState('minesweeper', gameId, {
+            currentTurn: isCreator ? 
+              (nextTurn === PlayerTurn.PLAYER_ONE ? publicKey?.toString() : '') : 
+              (nextTurn === PlayerTurn.PLAYER_TWO ? publicKey?.toString() : ''),
+            gameData: {
+              grid: newGrid,
+              revealedCount: revealedCount,
+              lastMove: { row, col }
+            }
+          });
+          console.log("Game state updated after move");
+        } catch (error) {
+          console.error("Error updating game state after move:", error);
+        }
         
         // Switch turns
         setPlayerTurn(nextTurn);
@@ -1317,9 +1448,9 @@ const MinesweeperGame: React.FC = () => {
             Current Bet: <span>{betAmount} SOL</span>
           </BetAmountDisplay>
           
-          <GameLink>{gameLink}</GameLink>
+          <GameLink className="game-link">{gameLink}</GameLink>
           
-          <ActionButton onClick={copyGameLink}>
+          <ActionButton onClick={copyGameLink} type="button">
             Copy Game Link
           </ActionButton>
           

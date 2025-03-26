@@ -147,6 +147,24 @@ const InputContainer = styled.div`
   border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 8px 12px;
+  
+  &.copied {
+    background-color: rgba(34, 197, 94, 0.2);
+    border-color: rgba(34, 197, 94, 0.5);
+    animation: pulse 1.5s ease;
+  }
+  
+  @keyframes pulse {
+    0% {
+      background-color: rgba(34, 197, 94, 0.2);
+    }
+    50% {
+      background-color: rgba(34, 197, 94, 0.4);
+    }
+    100% {
+      background-color: rgba(34, 197, 94, 0.2);
+    }
+  }
 `;
 
 const AmountInput = styled.input`
@@ -209,16 +227,51 @@ const ActionButton = styled.button`
   cursor: pointer;
   transition: all 0.2s ease;
   margin-bottom: 10px;
+  position: relative;
+  overflow: hidden;
   
   &:hover {
     background-color: #2563eb;
     transform: translateY(-1px);
   }
   
+  &:active {
+    transform: translateY(0);
+  }
+  
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+  }
+  
   &:disabled {
     background-color: rgba(59, 130, 246, 0.5);
     cursor: not-allowed;
     transform: none;
+  }
+  
+  /* Ripple effect */
+  &:after {
+    content: "";
+    display: block;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    background-image: radial-gradient(circle, #fff 10%, transparent 10.01%);
+    background-repeat: no-repeat;
+    background-position: 50%;
+    transform: scale(10, 10);
+    opacity: 0;
+    transition: transform .3s, opacity .5s;
+  }
+  
+  &:active:after {
+    transform: scale(0, 0);
+    opacity: .3;
+    transition: 0s;
   }
 `;
 
@@ -893,32 +946,77 @@ const BlackjackGame: React.FC = () => {
   const handleHit = async () => {
     if (gameState !== GameState.PLAYING || currentTurn !== PlayerTurn.PLAYER) return;
     
-    const deck = generateDeck();
-    const newCard = drawCard(deck);
-    const updatedHand = [...playerHand, newCard];
-    setPlayerHand(updatedHand);
+    console.log("Player chose to hit");
     
-    const newScore = calculateHandValue(updatedHand);
-    setPlayerScore(newScore);
-    
-    // Check if player busts
-    if (newScore > 21) {
-      setResult(GameResult.LOSE);
-      setGameState(GameState.RESULT);
+    try {
+      const deck = generateDeck();
+      const newCard = drawCard(deck);
+      console.log(`Drew new card: ${newCard.value} of ${newCard.suit}`);
       
-      // Update game state in Firebase
-      if (gameSessionId) {
-        await updateGameState('blackjack', gameSessionId, {
-          gameData: {
-            playerHand: updatedHand,
-            playerScore: newScore,
-            result: GameResult.LOSE,
-            lastAction: 'hit',
-            currentTurn: 'opponent'
-          }
-        });
+      const updatedHand = [...playerHand, newCard];
+      setPlayerHand(updatedHand);
+      
+      const newScore = calculateHandValue(updatedHand);
+      console.log(`New player score: ${newScore}`);
+      setPlayerScore(newScore);
+      
+      // Check if player busts
+      if (newScore > 21) {
+        console.log("Player busted!");
+        setResult(GameResult.LOSE);
+        setGameState(GameState.RESULT);
+        
+        // Update game state in Firebase
+        if (gameSessionId) {
+          await updateGameState('blackjack', gameSessionId, {
+            gameData: {
+              playerHand: updatedHand,
+              playerScore: newScore,
+              result: GameResult.LOSE,
+              lastAction: 'hit',
+              currentTurn: 'opponent'
+            }
+          });
+          console.log("Game state updated after bust");
+        }
+      } else {
+        // Switch turn to opponent
+        console.log("Switching turn to opponent");
+        setCurrentTurn(PlayerTurn.OPPONENT);
+        
+        // Update game state in Firebase
+        if (gameSessionId) {
+          await updateGameState('blackjack', gameSessionId, {
+            currentTurn: publicKey ? (publicKey.toString() === gameSessionId ? gameSessionId : publicKey.toString()) : '',
+            gameData: {
+              playerHand: updatedHand,
+              playerScore: newScore,
+              lastAction: 'hit',
+              currentTurn: 'opponent'
+            }
+          });
+          console.log("Game state updated after hit");
+        }
+        
+        // If playing against computer, simulate opponent's turn
+        if (connectionState !== ConnectionState.OPPONENT_CONNECTED) {
+          console.log("Simulating opponent turn");
+          setTimeout(() => {
+            handleOpponentTurn();
+          }, 1500);
+        }
       }
-    } else {
+    } catch (error) {
+      console.error("Error handling hit action:", error);
+    }
+  };
+  
+  const handleStand = async () => {
+    if (gameState !== GameState.PLAYING || currentTurn !== PlayerTurn.PLAYER) return;
+    
+    console.log("Player chose to stand");
+    
+    try {
       // Switch turn to opponent
       setCurrentTurn(PlayerTurn.OPPONENT);
       
@@ -927,45 +1025,22 @@ const BlackjackGame: React.FC = () => {
         await updateGameState('blackjack', gameSessionId, {
           currentTurn: publicKey ? (publicKey.toString() === gameSessionId ? gameSessionId : publicKey.toString()) : '',
           gameData: {
-            playerHand: updatedHand,
-            playerScore: newScore,
-            lastAction: 'hit',
+            lastAction: 'stand',
             currentTurn: 'opponent'
           }
         });
+        console.log("Game state updated after stand");
       }
       
       // If playing against computer, simulate opponent's turn
       if (connectionState !== ConnectionState.OPPONENT_CONNECTED) {
+        console.log("Simulating opponent turn after player stand");
         setTimeout(() => {
           handleOpponentTurn();
         }, 1500);
       }
-    }
-  };
-  
-  const handleStand = async () => {
-    if (gameState !== GameState.PLAYING || currentTurn !== PlayerTurn.PLAYER) return;
-    
-    // Switch turn to opponent
-    setCurrentTurn(PlayerTurn.OPPONENT);
-    
-    // Update game state in Firebase
-    if (gameSessionId) {
-      await updateGameState('blackjack', gameSessionId, {
-        currentTurn: publicKey ? (publicKey.toString() === gameSessionId ? gameSessionId : publicKey.toString()) : '',
-        gameData: {
-          lastAction: 'stand',
-          currentTurn: 'opponent'
-        }
-      });
-    }
-    
-    // If playing against computer, simulate opponent's turn
-    if (connectionState !== ConnectionState.OPPONENT_CONNECTED) {
-      setTimeout(() => {
-        handleOpponentTurn();
-      }, 1500);
+    } catch (error) {
+      console.error("Error handling stand action:", error);
     }
   };
   
@@ -1046,10 +1121,10 @@ const BlackjackGame: React.FC = () => {
     
     return (
       <GameActions>
-        <HitButton onClick={handleHit}>
+        <HitButton onClick={handleHit} type="button" disabled={currentTurn !== PlayerTurn.PLAYER}>
           Hit
         </HitButton>
-        <StandButton onClick={handleStand}>
+        <StandButton onClick={handleStand} type="button" disabled={currentTurn !== PlayerTurn.PLAYER}>
           Stand
         </StandButton>
       </GameActions>
@@ -1093,10 +1168,10 @@ const BlackjackGame: React.FC = () => {
           </BettingSection>
           
           <ActionsSection>
-            <ActionButton onClick={handleCreateGame} disabled={!connected}>
+            <ActionButton onClick={handleCreateGame} type="button" disabled={!connected}>
               Create Game
             </ActionButton>
-            <FindOpponentButton onClick={handleFindOpponent} disabled={!connected}>
+            <FindOpponentButton onClick={handleFindOpponent} type="button" disabled={!connected}>
               Find Opponent
             </FindOpponentButton>
           </ActionsSection>
@@ -1111,7 +1186,11 @@ const BlackjackGame: React.FC = () => {
                 onChange={(e) => setInviteCode(e.target.value)}
               />
             </InputContainer>
-            <ActionButton onClick={handleJoinGame} disabled={!connected || !inviteCode}>
+            <ActionButton 
+              onClick={() => handleJoinGame()} 
+              type="button" 
+              disabled={!connected || !inviteCode}
+            >
               Join Game
             </ActionButton>
           </ActionsSection>
@@ -1136,7 +1215,7 @@ const BlackjackGame: React.FC = () => {
           </BetAmountDisplay>
           
           <InputLabel>Share this code with your opponent</InputLabel>
-          <InputContainer style={{ marginBottom: '12px' }}>
+          <InputContainer className="game-invite-code" style={{ marginBottom: '12px' }}>
             <AmountInput 
               type="text" 
               value={inviteCode}
@@ -1144,7 +1223,7 @@ const BlackjackGame: React.FC = () => {
             />
           </InputContainer>
           
-          <ActionButton onClick={copyGameLink}>
+          <ActionButton onClick={copyGameLink} type="button">
             Copy Game Link
           </ActionButton>
           
@@ -1348,9 +1427,36 @@ const BlackjackGame: React.FC = () => {
   };
   
   // Function to copy game link to clipboard
-  const copyGameLink = () => {
-    navigator.clipboard.writeText(gameLink);
-    alert('Game link copied to clipboard!');
+  const copyGameLink = async () => {
+    if (!gameLink) return;
+    
+    try {
+      await navigator.clipboard.writeText(gameLink);
+      
+      // Visual feedback for the copy
+      const linkElement = document.querySelector('.game-invite-code');
+      if (linkElement) {
+        const originalValue = linkElement.textContent;
+        linkElement.textContent = "Copied!";
+        linkElement.classList.add('copied');
+        
+        setTimeout(() => {
+          linkElement.textContent = originalValue;
+          linkElement.classList.remove('copied');
+        }, 1500);
+      }
+    } catch (error) {
+      console.error("Failed to copy:", error);
+      // Fallback method
+      const textarea = document.createElement('textarea');
+      textarea.value = gameLink;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      
+      alert('Game link copied to clipboard!');
+    }
   };
   
   return (
