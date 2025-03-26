@@ -2,10 +2,5 @@
   "/_app": "pages/_app.js",
   "/_error": "pages/_error.js",
   "/_document": "pages/_document.js",
-  "/game/minesweeper": "pages/game/minesweeper.js",
-  "/games": "pages/games.js",
-  "/game/rock-paper-scissors": "pages/game/rock-paper-scissors.js",
-  "/404": "pages/404.js",
-  "/api/solana/rpc": "pages/api/solana/rpc.js",
-  "/api/solana/balance/[address]": "pages/api/solana/balance/[address].js"
+  "/game/minesweeper": "pages/game/minesweeper.js"
 }

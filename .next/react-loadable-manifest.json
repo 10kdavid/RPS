@@ -90,5 +90,13 @@
   "..\\node_modules\\viem\\_esm\\utils\\signature\\recoverPublicKey.js -> @noble/curves/secp256k1": {
     "id": "..\\node_modules\\viem\\_esm\\utils\\signature\\recoverPublicKey.js -> @noble/curves/secp256k1",
     "files": []
+  },
+  "pages\\game\\minesweeper.tsx -> firebase/app": {
+    "id": "pages\\game\\minesweeper.tsx -> firebase/app",
+    "files": []
+  },
+  "pages\\game\\minesweeper.tsx -> firebase/database": {
+    "id": "pages\\game\\minesweeper.tsx -> firebase/database",
+    "files": []
   }
 }

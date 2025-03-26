@@ -118,10 +118,9 @@ const PageContainer = styled.div`
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background-color: #101d2f;
+  background-color: #0c1524;
   color: white;
   position: relative;
-  padding: 0 20px;
 `;
 
 const GameWrapper = styled.div`
@@ -130,7 +129,7 @@ const GameWrapper = styled.div`
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
-  padding-top: 40px;
+  padding: 40px 20px;
 `;
 
 const GameContainer = styled.div`
@@ -146,7 +145,7 @@ const GameContainer = styled.div`
 `;
 
 const LeftPanel = styled.div`
-  width: 300px;
+  width: 320px;
   background-color: #142438;
   border-radius: 12px;
   padding: 25px;
@@ -155,6 +154,17 @@ const LeftPanel = styled.div`
   
   @media (max-width: 968px) {
     width: 100%;
+  }
+  
+  h2 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 1.5rem;
+  }
+  
+  p {
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 20px;
   }
 `;
 
@@ -489,7 +499,7 @@ const CellContent = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
+  font-size: 2rem;
 `;
 
 const MineElement = styled.div`
@@ -514,70 +524,55 @@ const GridContainer = styled.div`
   grid-template-columns: repeat(5, 1fr);
   grid-template-rows: repeat(5, 1fr);
   gap: 10px;
-  margin: 0 auto;
+  margin: 20px auto;
   width: 100%;
-  max-width: 600px;
+  max-width: 500px;
   aspect-ratio: 1/1;
 `;
 
 interface CellProps {
   revealed: boolean;
   hasMine?: boolean;
-  isAnimating: boolean;
+  isAnimating?: boolean;
 }
 
 const CellButton = styled.button<CellProps>`
   width: 100%;
   height: 0;
-  padding-bottom: 100%; /* Makes it square */
+  padding-bottom: 100%;
   background-color: ${props => props.revealed 
-    ? (props.hasMine ? '#ff394f' : '#1e3245')
-    : '#213043'};
+    ? props.hasMine 
+      ? '#ff4757' // Red for mines
+      : '#00ecaa' // Green for gems
+    : '#1e3251'}; // Blue for unrevealed
   border-radius: 8px;
   border: 2px solid ${props => props.revealed 
-    ? (props.hasMine ? 'rgba(255, 57, 79, 0.5)' : 'rgba(0, 236, 170, 0.3)')
-    : 'rgba(255, 255, 255, 0.05)'};
+    ? props.hasMine 
+      ? '#ff2c44' 
+      : '#00d69c'
+    : '#2a4573'};
   display: flex;
   position: relative;
   cursor: ${props => props.revealed ? 'default' : 'pointer'};
-  transition: all 0.15s ease;
-  perspective: 1000px;
-  transform-style: preserve-3d;
-  outline: none;
-  
-  ${props => props.isAnimating && css`
-    animation: ${flipAnimation} 0.4s ease-out forwards;
-  `}
-  
-  ${props => props.revealed && props.hasMine && css`
-    animation: ${shakeAnimation} 0.4s ease-in-out;
-  `}
-  
-  ${props => props.revealed && !props.hasMine && css`
-    animation: ${glowAnimation} 2s ease-in-out infinite;
-  `}
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  animation: ${props => props.isAnimating 
+    ? props.hasMine 
+      ? css`${shakeAnimation} 0.5s ease-in-out` 
+      : css`${flipAnimation} 0.5s ease-in-out`
+    : 'none'};
   
   &:hover {
-    transform: ${props => !props.revealed && 'translateY(-2px)'};
-    box-shadow: ${props => !props.revealed && '0 6px 12px rgba(0, 0, 0, 0.2)'};
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-  
-  &:focus {
-    outline: none;
-    border-color: ${props => !props.revealed && 'rgba(0, 236, 170, 0.5)'};
-  }
-  
-  &:active {
-    transform: ${props => !props.revealed && 'translateY(0)'};
-    box-shadow: none;
+    transform: ${props => props.revealed ? 'none' : 'scale(1.05)'};
+    background-color: ${props => props.revealed 
+      ? props.hasMine 
+        ? '#ff4757'
+        : '#00ecaa'
+      : '#253e66'};
   }
   
   &:disabled {
     cursor: default;
     opacity: ${props => props.revealed ? 1 : 0.7};
-    transform: none;
-    box-shadow: none;
   }
 `;
 
@@ -688,8 +683,20 @@ interface SidebarProps {
 
 const MainContent = styled.div`
   padding: 20px;
-  background-color: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.8);
+  
+  h3 {
+    margin-top: 0;
+    color: white;
+  }
+  
+  ul {
+    padding-left: 20px;
+  }
+  
+  li {
+    margin-bottom: 8px;
+  }
 `;
 
 const GameLink = styled.div`
@@ -841,29 +848,45 @@ const EscrowPlayerStatus = styled.div<PlayerStatusProps>`
 
 const TabsContainer = styled.div`
   display: flex;
-  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   margin-bottom: 20px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  
+  &::-webkit-scrollbar {
+    height: 5px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+  }
 `;
 
-const Tab = styled.button<{ active: boolean }>`
-  background-color: ${props => props.active ? '#00ecaa' : 'rgba(255, 255, 255, 0.1)'};
+interface TabProps {
+  active: boolean;
+}
+
+const Tab = styled.button<TabProps>`
+  padding: 12px 20px;
+  background: transparent;
   border: none;
-  border-radius: 8px;
-  padding: 10px 20px;
+  color: ${props => props.active ? 'white' : 'rgba(255, 255, 255, 0.6)'};
+  font-weight: ${props => props.active ? '600' : '400'};
+  border-bottom: 2px solid ${props => props.active ? '#00ecaa' : 'transparent'};
   cursor: pointer;
-  font-weight: 600;
-  color: ${props => props.active ? '#0e1923' : 'rgba(255, 255, 255, 0.6)'};
   transition: all 0.2s;
+  white-space: nowrap;
   
   &:hover {
-    background-color: ${props => props.active ? '#00d69c' : 'rgba(255, 255, 255, 0.2)'};
+    color: white;
   }
 `;
 
 const BottomSection = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  background-color: #142438;
+  border-radius: 12px;
+  padding: 20px;
   margin-top: 20px;
 `;
 
@@ -871,7 +894,12 @@ const BottomSection = styled.div`
 const MinesweeperGame: React.FC = () => {
   const router = useRouter();
   const { publicKey, connected } = useWallet();
-  const { connected: crossmintConnected, walletAddress: crossmintAddress } = useCrossmintWallet();
+  const { 
+    connected: crossmintConnected, 
+    walletAddress: crossmintAddress,
+    createEscrowWallet,
+    sendToEscrow
+  } = useCrossmintWallet();
   
   // Game state
   const [activeTab, setActiveTab] = useState<'create' | 'join' | 'matchmaking' | 'game' | 'bigWins' | 'luckyWins' | 'challenges' | 'description'>('create');
@@ -955,7 +983,8 @@ const MinesweeperGame: React.FC = () => {
   };
 
   const generateGameLink = (id: string) => {
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    // Use hardcoded domain to ensure proper share links across environments
+    const baseUrl = "https://rockpapersolana.com";
     return `${baseUrl}/game/minesweeper?id=${id}`;
   };
 
@@ -968,69 +997,232 @@ const MinesweeperGame: React.FC = () => {
   };
 
   const handleCreateGame = async () => {
-    setGameMessages([]);
-    
-    // Create a new game session
-    const newGameId = Math.random().toString(36).substring(2, 10);
-    setGameId(newGameId);
-    setGameLink(generateGameLink(newGameId));
-    
-    const newGrid = initializeGrid();
-    setGrid(newGrid);
-    
-    // Set player as creator
-    setHasOpponent(false);
-    setGameState(GameStateEnum.WAITING);
-    setActiveScreen('game');
-    
-    addGameMessage("Game created! Waiting for opponent. Share the link to invite someone.");
+    try {
+      console.log("Create game button clicked");
+      setGameMessages([]);
+      
+      if (!connected && !crossmintConnected) {
+        console.log("No wallet connected - connected:", connected, "crossmintConnected:", crossmintConnected);
+        addGameMessage("⚠️ Please connect your wallet to create a game.");
+        return;
+      }
+      
+      // Test Firebase connection directly
+      try {
+        // Get a reference to the database
+        const database = await import('firebase/database').then(db => db.getDatabase());
+        console.log("Firebase database accessed:", database ? "success" : "null");
+        
+        // Test if we can read/write
+        const testRef = await import('firebase/database').then(db => db.ref(database, 'test_connection'));
+        await import('firebase/database').then(db => db.set(testRef, { timestamp: Date.now() }));
+        console.log("Firebase write test successful");
+      } catch (fbError) {
+        console.error("Firebase test failed:", fbError);
+        addGameMessage("⚠️ Error connecting to Firebase. Check console for details.");
+        // Continue anyway to see if the main functionality works
+      }
+      
+      console.log("Creating game with wallet", publicKey?.toString() || crossmintAddress || 'anonymous');
+      
+      // Create a new game session in Firebase
+      const playerId = publicKey?.toString() || crossmintAddress || 'anonymous';
+      console.log("Calling createGameSession with player", playerId);
+      
+      try {
+        const newGameId = await createGameSession('minesweeper', playerId);
+        console.log("Game session created with ID:", newGameId);
+        
+        // Rest of the function...
+        setGameId(newGameId);
+        setGameLink(generateGameLink(newGameId));
+        
+        // Initialize the grid
+        console.log("Initializing grid");
+        const newGrid = initializeGrid();
+        setGrid(newGrid);
+        
+        // Update game data with grid and bet amount
+        console.log("Updating game state with grid and bet amount:", betAmount);
+        await updateGameState('minesweeper', newGameId, {
+          gameData: {
+            grid: newGrid,
+            betAmount: betAmount
+          }
+        });
+        
+        // Create an escrow wallet for this game if using Crossmint
+        if (crossmintConnected && createEscrowWallet) {
+          try {
+            console.log("Creating escrow wallet");
+            const escrowAddr = await createEscrowWallet(newGameId);
+            console.log("Escrow wallet created:", escrowAddr);
+            setEscrowAddress(escrowAddr);
+            
+            // Update game with escrow address
+            console.log("Updating game with escrow address");
+            await updateGameState('minesweeper', newGameId, {
+              gameData: {
+                escrowAddress: escrowAddr,
+                escrowFunded: {}
+              }
+            });
+            
+            addGameMessage("✅ Secure escrow wallet created for game.");
+          } catch (escrowError) {
+            console.error("Error creating escrow:", escrowError);
+            addGameMessage("⚠️ Could not create escrow wallet. Game will continue without secure betting.");
+          }
+        } else {
+          console.log("Skipping escrow wallet creation - crossmintConnected:", crossmintConnected, "createEscrowWallet:", !!createEscrowWallet);
+        }
+        
+        // Set game state
+        console.log("Setting game state to WAITING");
+        setHasOpponent(false);
+        setGameState(GameStateEnum.WAITING);
+        setActiveScreen('game');
+        
+        // Start listening for game updates
+        console.log("Setting up game update listener");
+        listenToGameUpdates('minesweeper', newGameId, (data) => {
+          console.log("Game update received:", data);
+          
+          // Update opponent info if someone joined
+          if (data.opponent && !hasOpponent) {
+            setHasOpponent(true);
+            setOpponentAddress(data.opponent);
+            setGameState(GameStateEnum.PLAYING);
+            addGameMessage("Opponent joined! Game starting.");
+          }
+          
+          // Update escrow funding status if available
+          if (data.gameData?.escrowFunded) {
+            setEscrowFunded(data.gameData.escrowFunded);
+            
+            // Check if both players funded
+            const bothFunded = 
+              data.gameData.escrowFunded[playerId] && 
+              data.opponent && 
+              data.gameData.escrowFunded[data.opponent];
+            
+            if (bothFunded && !data.gameData.bothFundedNotified) {
+              addGameMessage("✅ Both players have funded the escrow. Game is ready!");
+              
+              // Mark as notified
+              updateGameState('minesweeper', newGameId, {
+                gameData: {
+                  bothFundedNotified: true
+                }
+              });
+            }
+          }
+        });
+        
+        console.log("Game creation complete");
+        addGameMessage("Game created! Waiting for opponent. Share the link to invite someone.");
+      } catch (createError) {
+        console.error("Error in createGameSession:", createError);
+        addGameMessage(`⚠️ Error creating game session: ${createError.message}`);
+        alert("Failed to create game: " + createError.message);
+      }
+    } catch (error) {
+      console.error("Error creating game:", error);
+      // Display more detailed error information
+      if (error instanceof Error) {
+        addGameMessage(`⚠️ Error creating game: ${error.message}`);
+        console.error("Error stack:", error.stack);
+        alert("Error creating game: " + error.message);
+      } else {
+        addGameMessage(`⚠️ Error creating game: Unknown error`);
+        alert("Unknown error creating game");
+      }
+    }
   };
 
   const joinGame = async (id: string) => {
-    if (!id) {
-      alert("Please enter a game ID");
-      return;
+    try {
+      if (!id) {
+        alert("Please enter a game ID");
+        return;
+      }
+      
+      setGameMessages([]);
+      addGameMessage(`Joining game ${id}...`);
+      
+      // Check if game exists
+      const gameExists = await checkGameExists('minesweeper', id);
+      if (!gameExists) {
+        addGameMessage("⚠️ Game not found. Please check the ID and try again.");
+        return;
+      }
+      
+      // Join the game session using Firebase
+      await joinGameSession('minesweeper', id, publicKey?.toString() || crossmintAddress || 'anonymous');
+      
+      // Set game info
+      setGameId(id);
+      setGameState(GameStateEnum.WAITING);
+      setActiveScreen('game');
+      
+      // Start listening for game updates
+      const unsubscribe = listenToGameUpdates('minesweeper', id, (data) => {
+        console.log("Game update received:", data);
+        
+        // Update game state based on data
+        if (data.status === 'waiting') {
+          setGameState(GameStateEnum.WAITING);
+        } else if (data.status === 'playing') {
+          setGameState(GameStateEnum.PLAYING);
+          addGameMessage("Game started! Your turn.");
+        }
+        
+        // Update opponent info if available
+        if (data.opponent) {
+          setHasOpponent(true);
+          setOpponentAddress(data.opponent);
+        }
+        
+        // Update grid if available
+        if (data.gameData?.grid) {
+          setGrid(data.gameData.grid);
+        }
+        
+        // Update escrow info if available
+        if (data.gameData?.escrowAddress) {
+          setEscrowAddress(data.gameData.escrowAddress);
+        }
+        
+        // Update escrow funding status if available
+        if (data.gameData?.escrowFunded) {
+          setEscrowFunded(data.gameData.escrowFunded);
+        }
+      });
+      
+      addGameMessage("Successfully joined the game!");
+    } catch (error) {
+      console.error("Error joining game:", error);
+      addGameMessage(`⚠️ Error joining game: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-    
-    setGameMessages([]);
-    
-    // Set game info
-    setGameId(id);
-    setGameState(GameStateEnum.WAITING);
-    setActiveScreen('game');
-    setHasOpponent(true);
-    setOpponentAddress("DEMO_OPPONENT_ADDRESS");
-    
-    // Initialize the grid
-    const newGrid = initializeGrid();
-    setGrid(newGrid);
-    
-    addGameMessage("Joined game! Waiting for opponent to start.");
-    
-    // Start game
-    setTimeout(() => {
-      setGameState(GameStateEnum.PLAYING);
-      addGameMessage("Game started! Your turn.");
-    }, 2000);
   };
 
   const fundEscrow = async (gameId: string, address: string, amount: number) => {
     try {
       console.log(`Funding escrow ${address} with ${amount} SOL for game ${gameId}`);
       
-      if (crossmintAddress) {
-        // Use Crossmint wallet for transaction
-        const { sendToEscrow } = useCrossmintWallet();
+      if (!gameId || !address) {
+        addGameMessage("⚠️ Missing game ID or escrow address.");
+        return false;
+      }
+      
+      if (crossmintConnected && crossmintAddress && sendToEscrow) {
+        // Use Crossmint wallet's dedicated escrow function
         
-        if (!crossmintConnected) {
-          addGameMessage("⚠️ Crossmint wallet not connected. Please connect your wallet.");
-          return false;
-        }
-        
-        // Send funds to escrow using the Crossmint API
+        // Attempt to send funds to escrow
+        addGameMessage(`Sending ${amount} SOL to escrow...`);
         const result = await sendToEscrow(gameId, address, amount);
         
-        if (result) {
+        if (result && result.signature) {
           console.log("Transaction successful:", result);
           
           // Update local state
@@ -1038,7 +1230,7 @@ const MinesweeperGame: React.FC = () => {
           newEscrowFunded[crossmintAddress] = true;
           setEscrowFunded(newEscrowFunded);
           
-          // Update game data in Firebase to reflect funding
+          // Update game data in Firebase
           await updateGameState('minesweeper', gameId, {
             gameData: {
               escrowFunded: {
@@ -1047,16 +1239,13 @@ const MinesweeperGame: React.FC = () => {
             }
           });
           
-          addGameMessage(`✅ Escrow funded with ${amount} SOL successfully!`);
+          addGameMessage(`✅ Escrow funded with ${amount} SOL successfully! Transaction: ${result.signature.slice(0, 8)}...`);
           return true;
         } else {
-          throw new Error("Transaction failed");
+          throw new Error("Transaction failed - no signature returned");
         }
-      } else if (publicKey) {
-        // For native Solana wallet, we need to implement the escrow functionality
-        // This would require a full solana program for secure escrow
-        
-        addGameMessage("⚠️ Native Solana wallet escrow not implemented yet. Please use Crossmint wallet.");
+      } else if (connected && publicKey) {
+        addGameMessage("⚠️ For secure escrow, please use the Crossmint wallet. Support for native Solana wallets coming soon.");
         return false;
       } else {
         addGameMessage("⚠️ No wallet connected. Please connect a wallet to play.");
@@ -1071,6 +1260,69 @@ const MinesweeperGame: React.FC = () => {
 
   const addGameMessage = (message: string) => {
     setGameMessages(prev => [...prev, message]);
+  };
+
+  // Add a simple test function to verify the button is working
+  const testButtonClick = () => {
+    console.log("TEST BUTTON CLICKED");
+    alert("Button clicked - check console for logs");
+  };
+
+  // Add a manual game creation function that bypasses the normal flow
+  const createGameManually = async () => {
+    try {
+      console.log("Creating game manually...");
+      
+      // Generate a game ID manually
+      const gameId = Math.random().toString(36).substring(2, 10).toUpperCase();
+      console.log("Manual game ID generated:", gameId);
+      
+      // Set up the game state directly
+      setGameId(gameId);
+      setGameLink(generateGameLink(gameId));
+      setGameState(GameStateEnum.WAITING);
+      setActiveScreen('game');
+      setGrid(initializeGrid());
+      
+      // Add a message
+      setGameMessages(["Game created manually! ID: " + gameId]);
+      addGameMessage("Share this link with a friend to play: " + generateGameLink(gameId));
+      
+      console.log("Manual game creation complete");
+      
+      return gameId;
+    } catch (error) {
+      console.error("Error in manual game creation:", error);
+      alert("Error creating game manually: " + error);
+      return null;
+    }
+  };
+
+  // Add a super simple direct Firebase test function
+  const testFirebaseConnection = async () => {
+    try {
+      console.log("Testing Firebase connection...");
+      
+      // Try to import Firebase dependencies
+      const firebase = await import('firebase/app');
+      const database = await import('firebase/database');
+      
+      console.log("Firebase imports successful:", !!firebase, !!database);
+      
+      // Try to get a reference to the database
+      const db = database.getDatabase();
+      console.log("Got database reference:", !!db);
+      
+      // Try to write to a test location
+      const testRef = database.ref(db, 'test_connection');
+      await database.set(testRef, { timestamp: Date.now() });
+      
+      console.log("Firebase write successful!");
+      alert("Firebase connection test successful! Check console for details.");
+    } catch (error) {
+      console.error("Firebase test failed:", error);
+      alert("Firebase test failed: " + (error instanceof Error ? error.message : String(error)));
+    }
   };
 
   // Effect to handle game ID from URL on page load
@@ -1091,10 +1343,11 @@ const MinesweeperGame: React.FC = () => {
     <PageContainer>
       <Head>
         <title>Minesweeper | Rock Paper Solana</title>
+        <meta name="description" content="Play Minesweeper on Solana blockchain and win SOL tokens. Strategic multiplayer mining game with secure betting." />
       </Head>
       <AppSidebar 
         collapsed={false}
-        currentPage="minesweeper"
+        currentPage="mines"
         toggleSidebar={() => {}}
       />
       <GameWrapper>
@@ -1103,7 +1356,7 @@ const MinesweeperGame: React.FC = () => {
             {gameState === GameStateEnum.INIT && (
               <>
                 <h2>Minesweeper</h2>
-                <p>Find all the gems without hitting any mines!</p>
+                <p>Find all the gems without hitting any mines! Each game has 5 mines hidden on the board.</p>
                 
                 <AmountContainer>
                   <InputLabel>Bet Amount (SOL)</InputLabel>
@@ -1126,46 +1379,41 @@ const MinesweeperGame: React.FC = () => {
                   </ButtonsContainer>
                 </AmountContainer>
                 
-                <MinesContainer>
-                  <InputLabel>Game Mode</InputLabel>
-                  <SelectButton>
-                    Classic Mode (5 mines)
-                  </SelectButton>
-                </MinesContainer>
-                
-                {isMultiplayer ? (
-                  <>
-                    <ActionButton onClick={handleCreateGame}>
-                      Create Game
-                    </ActionButton>
-                    
-                    <OrText>OR</OrText>
-                    
-                    <InputLabel>Join Existing Game</InputLabel>
-                    <InputContainer>
-                      <AmountInput 
-                        type="text" 
-                        placeholder="Enter game ID" 
-                        value={joinGameId}
-                        onChange={(e) => setJoinGameId(e.target.value)}
-                      />
-                    </InputContainer>
-                    <ActionButton 
-                      onClick={() => joinGame(joinGameId)} 
-                      style={{ marginTop: '10px', backgroundColor: '#2a4365' }}
-                    >
-                      Join Game
-                    </ActionButton>
-                  </>
-                ) : (
-                  <ActionButton onClick={() => {
-                    setGrid(initializeGrid());
-                    setGameState(GameStateEnum.PLAYING);
-                    setActiveScreen('game');
-                  }}>
-                    Start Game
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <ActionButton onClick={testButtonClick}>
+                    Test Button Click
                   </ActionButton>
-                )}
+                  
+                  <ActionButton onClick={handleCreateGame}>
+                    Create Game (Original)
+                  </ActionButton>
+                  
+                  <ActionButton onClick={createGameManually} style={{ backgroundColor: '#ff6b6b' }}>
+                    Create Game (Manual Bypass)
+                  </ActionButton>
+                  
+                  <ActionButton onClick={testFirebaseConnection} style={{ backgroundColor: '#4834d4' }}>
+                    Test Firebase Connection
+                  </ActionButton>
+                </div>
+                
+                <OrText>OR</OrText>
+                
+                <InputLabel>Join Existing Game</InputLabel>
+                <InputContainer>
+                  <AmountInput 
+                    type="text" 
+                    placeholder="Enter game ID" 
+                    value={joinGameId}
+                    onChange={(e) => setJoinGameId(e.target.value)}
+                  />
+                </InputContainer>
+                <ActionButton 
+                  onClick={() => joinGame(joinGameId)} 
+                  style={{ marginTop: '10px', backgroundColor: '#2a4365' }}
+                >
+                  Join Game
+                </ActionButton>
               </>
             )}
             
