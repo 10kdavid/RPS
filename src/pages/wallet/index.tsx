@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import Head from 'next/head';
 import { useWallet } from '../../contexts/WalletContext';
+import { useCrossmintWallet } from '../../contexts/CrossmintWalletContext';
 
 const PageContainer = styled.div`
   padding: 20px;
@@ -236,118 +237,155 @@ interface Transaction {
   game?: string;
 }
 
+const WalletCardHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+`;
+
+const WalletType = styled.span`
+  background: var(--primary-bg);
+  padding: 4px 10px;
+  border-radius: 15px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+`;
+
+const LoadingSpinner = styled.div`
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--button-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-left: 10px;
+  
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+`;
+
 enum WalletTab {
   DEPOSIT = 'deposit',
   WITHDRAW = 'withdraw',
-  HISTORY = 'history'
+  HISTORY = 'history',
+  CROSSMINT = 'crossmint'
 }
 
 const WalletPage = () => {
   const { connected, balance, publicKey, openWalletModal } = useWallet();
+  const { 
+    connected: crossmintConnected, 
+    balance: crossmintBalance, 
+    walletAddress: crossmintAddress,
+    connectWallet: connectCrossmint,
+    createNewWallet: createCrossmintWallet,
+    refreshBalance: refreshCrossmintBalance,
+    isLoading: crossmintLoading
+  } = useCrossmintWallet();
+  
   const [activeTab, setActiveTab] = useState<WalletTab>(WalletTab.DEPOSIT);
   const [depositAmount, setDepositAmount] = useState<string>('');
   const [withdrawAmount, setWithdrawAmount] = useState<string>('');
   const [withdrawAddress, setWithdrawAddress] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   
-  // Sample transaction history
-  const transactions: Transaction[] = [
-    {
-      id: '1',
-      type: 'deposit',
-      amount: 2.5,
-      timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-      hash: '5xGh2...7Yfr'
-    },
-    {
-      id: '2',
-      type: 'win',
-      amount: 1.98,
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-      hash: '8dKm3...9Pzt',
-      game: 'Rock Paper Scissors'
-    },
-    {
-      id: '3',
-      type: 'loss',
-      amount: 1.0,
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3), // 3 hours ago
-      hash: '3rFp6...2Tqw',
-      game: 'Dice Roll'
-    },
-    {
-      id: '4',
-      type: 'withdraw',
-      amount: 5.0,
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-      hash: '7jHs9...4Gvb'
-    },
-    {
-      id: '5',
-      type: 'deposit',
-      amount: 10.0,
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2), // 2 days ago
-      hash: '2xTf8...5Lqn'
-    }
-  ];
-  
-  // Format wallet address
+  useEffect(() => {
+    // Load transaction history
+    setTransactions([
+      {
+        id: '1',
+        type: 'deposit',
+        amount: 1.5,
+        timestamp: new Date(Date.now() - 3600000 * 24 * 2), // 2 days ago
+        hash: '0x4a3d...7b21',
+      },
+      {
+        id: '2',
+        type: 'win',
+        amount: 0.35,
+        timestamp: new Date(Date.now() - 3600000 * 20), // 20 hours ago
+        hash: '0x8c7e...3f49',
+        game: 'Minesweeper'
+      },
+      {
+        id: '3',
+        type: 'loss',
+        amount: 0.12,
+        timestamp: new Date(Date.now() - 3600000 * 10), // 10 hours ago
+        hash: '0x2f5a...9d62',
+        game: 'Blackjack'
+      }
+    ]);
+  }, []);
+
+  // Format wallet address for display
   const formatAddress = (address: string | null) => {
-    if (!address) return '';
-    return `${address.substring(0, 10)}...${address.substring(address.length - 10)}`;
+    if (!address) return 'Not connected';
+    if (address.length > 20) {
+      return `${address.substring(0, 10)}...${address.substring(address.length - 10)}`;
+    }
+    return address;
   };
   
   // Copy address to clipboard
-  const copyAddress = () => {
-    if (publicKey) {
-      navigator.clipboard.writeText(publicKey);
-      alert('Address copied to clipboard!');
+  const copyAddress = (address: string | null) => {
+    if (address) {
+      navigator.clipboard.writeText(address);
+      alert('Address copied to clipboard');
     }
+  };
+  
+  // Format balance for display
+  const formatBalance = (bal: number): string => {
+    if (bal === 0) return "0.0000";
+    if (bal < 0.001 && bal > 0) return bal.toExponential(2);
+    return bal.toFixed(4);
   };
   
   // Handle deposit form submission
   const handleDeposit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!depositAmount || parseFloat(depositAmount) <= 0) return;
+    if (!depositAmount || isNaN(parseFloat(depositAmount)) || parseFloat(depositAmount) <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
     
-    setIsLoading(true);
-    // Simulate deposit process
-    setTimeout(() => {
-      alert(`Successfully initiated deposit of ${depositAmount} SOL`);
-      setDepositAmount('');
-      setIsLoading(false);
-    }, 1500);
+    alert(`Deposit of ${depositAmount} SOL initiated. Please send SOL to the provided address.`);
+    setDepositAmount('');
   };
   
   // Handle withdraw form submission
   const handleWithdraw = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) return;
+    if (!withdrawAmount || isNaN(parseFloat(withdrawAmount)) || parseFloat(withdrawAmount) <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+    
     if (parseFloat(withdrawAmount) > balance) {
       alert('Insufficient balance');
       return;
     }
     
-    setIsLoading(true);
-    // Simulate withdrawal process
-    setTimeout(() => {
-      alert(`Successfully withdrawn ${withdrawAmount} SOL to ${withdrawAddress || 'your wallet'}`);
-      setWithdrawAmount('');
-      setWithdrawAddress('');
-      setIsLoading(false);
-    }, 1500);
+    alert(`Successfully withdrawn ${withdrawAmount} SOL to ${withdrawAddress || 'your wallet'}`);
+    setWithdrawAmount('');
+    setWithdrawAddress('');
   };
   
-  // Format date for transaction history
+  // Format date for display
   const formatDate = (date: Date) => {
-    const now = new Date();
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-    
-    if (diffInHours < 24) {
-      return `${Math.floor(diffInHours)} hours ago`;
-    } else {
-      return `${Math.floor(diffInHours / 24)} days ago`;
-    }
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true
+    }).format(date);
   };
   
   return (
@@ -360,84 +398,140 @@ const WalletPage = () => {
       <PageContainer>
         <PageTitle>Wallet</PageTitle>
         
-        {connected ? (
+        {connected || crossmintConnected ? (
           <>
             <WalletSection>
+              {/* Regular Solana Wallet */}
               <WalletCard>
-                <WalletHeader>
-                  <WalletTitle>Wallet Balance</WalletTitle>
-                </WalletHeader>
+                <WalletCardHeader>
+                  <WalletTitle>Solana Wallet</WalletTitle>
+                  <WalletType>Standard</WalletType>
+                </WalletCardHeader>
                 
                 <WalletBalance>
-                  <BalanceLabel>Current Balance</BalanceLabel>
-                  <BalanceAmount>{balance.toFixed(4)}<BalanceCurrency>SOL</BalanceCurrency></BalanceAmount>
+                  <BalanceLabel>Available Balance</BalanceLabel>
+                  <BalanceAmount>{formatBalance(balance)}<BalanceCurrency>SOL</BalanceCurrency></BalanceAmount>
                 </WalletBalance>
                 
+                <AddressLabel>Wallet Address</AddressLabel>
                 <AddressContainer>
-                  <div>
-                    <AddressLabel>Wallet Address</AddressLabel>
-                    <AddressValue>{formatAddress(publicKey)}</AddressValue>
-                  </div>
-                  <CopyButton onClick={copyAddress}>Copy</CopyButton>
+                  <AddressValue>{formatAddress(publicKey)}</AddressValue>
+                  <CopyButton onClick={() => copyAddress(publicKey)}>Copy</CopyButton>
                 </AddressContainer>
+              </WalletCard>
+              
+              {/* Crossmint Smart Wallet */}
+              <WalletCard>
+                <WalletCardHeader>
+                  <WalletTitle>Crossmint Wallet</WalletTitle>
+                  <WalletType>Smart Wallet</WalletType>
+                </WalletCardHeader>
+                
+                {crossmintConnected ? (
+                  <>
+                    <WalletBalance>
+                      <BalanceLabel>Available Balance</BalanceLabel>
+                      <BalanceAmount>
+                        {formatBalance(crossmintBalance)}
+                        <BalanceCurrency>SOL</BalanceCurrency>
+                        {crossmintLoading && <LoadingSpinner />}
+                      </BalanceAmount>
+                    </WalletBalance>
+                    
+                    <AddressLabel>Wallet Address</AddressLabel>
+                    <AddressContainer>
+                      <AddressValue>{formatAddress(crossmintAddress)}</AddressValue>
+                      <CopyButton onClick={() => copyAddress(crossmintAddress)}>Copy</CopyButton>
+                    </AddressContainer>
+                    
+                    <WalletActionButtons>
+                      <ActionButton onClick={refreshCrossmintBalance} disabled={crossmintLoading}>
+                        {crossmintLoading ? 'Refreshing...' : 'Refresh Balance'}
+                      </ActionButton>
+                    </WalletActionButtons>
+                  </>
+                ) : (
+                  <WalletBalance>
+                    <BalanceLabel>Connect your Crossmint wallet</BalanceLabel>
+                    <ActionButton onClick={connectCrossmint} disabled={crossmintLoading}>
+                      {crossmintLoading ? 'Connecting...' : 'Connect Crossmint'}
+                    </ActionButton>
+                    <div style={{ margin: '15px 0', textAlign: 'center' }}>or</div>
+                    <ActionButton onClick={createCrossmintWallet} disabled={crossmintLoading}>
+                      {crossmintLoading ? 'Creating...' : 'Create New Wallet'}
+                    </ActionButton>
+                  </WalletBalance>
+                )}
               </WalletCard>
             </WalletSection>
             
             <WalletCard>
               <TabsContainer>
                 <Tab 
-                  active={activeTab === WalletTab.DEPOSIT} 
+                  active={activeTab === WalletTab.DEPOSIT}
                   onClick={() => setActiveTab(WalletTab.DEPOSIT)}
                 >
                   Deposit
                 </Tab>
                 <Tab 
-                  active={activeTab === WalletTab.WITHDRAW} 
+                  active={activeTab === WalletTab.WITHDRAW}
                   onClick={() => setActiveTab(WalletTab.WITHDRAW)}
                 >
                   Withdraw
                 </Tab>
                 <Tab 
-                  active={activeTab === WalletTab.HISTORY} 
+                  active={activeTab === WalletTab.HISTORY}
                   onClick={() => setActiveTab(WalletTab.HISTORY)}
                 >
-                  Transaction History
+                  History
+                </Tab>
+                <Tab 
+                  active={activeTab === WalletTab.CROSSMINT}
+                  onClick={() => setActiveTab(WalletTab.CROSSMINT)}
+                >
+                  Crossmint
                 </Tab>
               </TabsContainer>
               
               {activeTab === WalletTab.DEPOSIT && (
                 <form onSubmit={handleDeposit}>
                   <FormGroup>
-                    <FormLabel>Amount to Deposit (SOL)</FormLabel>
+                    <FormLabel>Deposit Amount (SOL)</FormLabel>
                     <FormInput 
                       type="number" 
-                      min="0.001" 
-                      step="0.001" 
-                      value={depositAmount} 
+                      placeholder="0.00" 
+                      step="0.01"
+                      min="0.01"
+                      value={depositAmount}
                       onChange={(e) => setDepositAmount(e.target.value)}
-                      placeholder="Enter amount"
                       required
                     />
                   </FormGroup>
                   
-                  <ActionButton type="submit" disabled={isLoading}>
-                    {isLoading ? 'Processing...' : 'Deposit'}
-                  </ActionButton>
+                  <FormGroup>
+                    <FormLabel>Your Deposit Address</FormLabel>
+                    <AddressContainer>
+                      <AddressValue>{formatAddress(publicKey)}</AddressValue>
+                      <CopyButton onClick={() => copyAddress(publicKey)}>Copy</CopyButton>
+                    </AddressContainer>
+                  </FormGroup>
+                  
+                  <ActionButton type="submit">Deposit SOL</ActionButton>
                 </form>
               )}
               
               {activeTab === WalletTab.WITHDRAW && (
                 <form onSubmit={handleWithdraw}>
                   <FormGroup>
-                    <FormLabel>Amount to Withdraw (SOL)</FormLabel>
+                    <FormLabel>Withdraw Amount (SOL)</FormLabel>
                     <FormInput 
                       type="number" 
-                      min="0.001" 
-                      step="0.001" 
-                      max={balance} 
-                      value={withdrawAmount} 
+                      placeholder="0.00" 
+                      step="0.01"
+                      min="0.01"
+                      max={balance.toString()}
+                      value={withdrawAmount}
                       onChange={(e) => setWithdrawAmount(e.target.value)}
-                      placeholder="Enter amount"
                       required
                     />
                   </FormGroup>
@@ -446,39 +540,87 @@ const WalletPage = () => {
                     <FormLabel>Destination Address (Optional)</FormLabel>
                     <FormInput 
                       type="text" 
-                      value={withdrawAddress} 
-                      onChange={(e) => setWithdrawAddress(e.target.value)}
                       placeholder="Leave empty to use connected wallet"
+                      value={withdrawAddress}
+                      onChange={(e) => setWithdrawAddress(e.target.value)}
                     />
                   </FormGroup>
                   
-                  <ActionButton type="submit" disabled={isLoading || !withdrawAmount || parseFloat(withdrawAmount) > balance}>
-                    {isLoading ? 'Processing...' : 'Withdraw'}
-                  </ActionButton>
+                  <ActionButton type="submit">Withdraw SOL</ActionButton>
                 </form>
               )}
               
               {activeTab === WalletTab.HISTORY && (
                 <TransactionList>
-                  {transactions.map(transaction => (
-                    <TransactionItem key={transaction.id}>
+                  {transactions.length > 0 ? transactions.map(tx => (
+                    <TransactionItem key={tx.id}>
                       <TransactionInfo>
                         <TransactionType>
-                          {transaction.type === 'deposit' ? 'Deposit' : 
-                           transaction.type === 'withdraw' ? 'Withdrawal' : 
-                           transaction.type === 'win' ? `Win (${transaction.game})` : 
-                           `Loss (${transaction.game})`}
+                          {tx.type === 'deposit' ? 'Deposit' : 
+                           tx.type === 'withdraw' ? 'Withdrawal' : 
+                           tx.type === 'win' ? `Win (${tx.game})` :
+                           `Loss (${tx.game})`}
                         </TransactionType>
-                        <TransactionDate>{formatDate(transaction.timestamp)}</TransactionDate>
-                        <TransactionHash>Tx: {transaction.hash}</TransactionHash>
+                        <TransactionDate>{formatDate(tx.timestamp)}</TransactionDate>
+                        <TransactionHash>Tx: {tx.hash}</TransactionHash>
                       </TransactionInfo>
-                      <TransactionAmount type={transaction.type}>
-                        {transaction.type === 'deposit' || transaction.type === 'win' ? '+' : '-'}
-                        {transaction.amount.toFixed(4)} SOL
+                      <TransactionAmount type={tx.type}>
+                        {tx.type === 'deposit' || tx.type === 'win' ? '+' : '-'}{tx.amount} SOL
                       </TransactionAmount>
                     </TransactionItem>
-                  ))}
+                  )) : (
+                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+                      No transaction history yet
+                    </div>
+                  )}
                 </TransactionList>
+              )}
+              
+              {activeTab === WalletTab.CROSSMINT && (
+                <div>
+                  <FormGroup>
+                    <FormLabel>Crossmint Smart Wallet</FormLabel>
+                    <p style={{ marginBottom: '15px', color: 'var(--text-secondary)' }}>
+                      Your Crossmint Smart Wallet allows you to perform transactions with ease. It's a non-custodial wallet solution that gives you full control of your assets.
+                    </p>
+                    
+                    {crossmintConnected ? (
+                      <>
+                        <FormLabel>Your Crossmint Address</FormLabel>
+                        <AddressContainer>
+                          <AddressValue>{crossmintAddress}</AddressValue>
+                          <CopyButton onClick={() => copyAddress(crossmintAddress)}>Copy</CopyButton>
+                        </AddressContainer>
+                        
+                        <div style={{ margin: '20px 0' }}>
+                          <FormLabel>Current Balance</FormLabel>
+                          <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--accent-green)' }}>
+                            {formatBalance(crossmintBalance)} SOL
+                            {crossmintLoading && <LoadingSpinner />}
+                          </div>
+                        </div>
+                        
+                        <ActionButton onClick={refreshCrossmintBalance} disabled={crossmintLoading}>
+                          {crossmintLoading ? 'Refreshing...' : 'Refresh Balance'}
+                        </ActionButton>
+                      </>
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '20px' }}>
+                        <p style={{ marginBottom: '20px', color: 'var(--text-secondary)' }}>
+                          You haven't connected a Crossmint wallet yet. Connect an existing wallet or create a new one.
+                        </p>
+                        <WalletActionButtons>
+                          <ActionButton onClick={connectCrossmint} disabled={crossmintLoading}>
+                            {crossmintLoading ? 'Connecting...' : 'Connect Existing'}
+                          </ActionButton>
+                          <ActionButton onClick={createCrossmintWallet} disabled={crossmintLoading}>
+                            {crossmintLoading ? 'Creating...' : 'Create New'}
+                          </ActionButton>
+                        </WalletActionButtons>
+                      </div>
+                    )}
+                  </FormGroup>
+                </div>
               )}
             </WalletCard>
           </>

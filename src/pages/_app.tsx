@@ -3,6 +3,7 @@ import type { AppProps } from 'next/app';
 import { ThemeProvider, createGlobalStyle } from 'styled-components';
 import Layout from '../components/Layout';
 import WalletProvider from '../contexts/WalletContext';
+import CrossmintWalletProvider from '../contexts/CrossmintWalletContext';
 import '../styles/globals.css';
 
 // Define theme for styled-components
@@ -53,11 +54,13 @@ function MyApp({ Component, pageProps }: AppProps) {
     <>
       <GlobalStyle />
       <ThemeProvider theme={theme}>
-        <WalletProvider>
-          <Layout>
-            <Component {...pageProps} />
-          </Layout>
-        </WalletProvider>
+        <CrossmintWalletProvider>
+          <WalletProvider>
+            <Layout>
+              <Component {...pageProps} />
+            </Layout>
+          </WalletProvider>
+        </CrossmintWalletProvider>
       </ThemeProvider>
     </>
   );

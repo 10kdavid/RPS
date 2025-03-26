@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useWallet } from '../contexts/WalletContext';
+import CrossmintWalletButton from './CrossmintWalletButton';
 
 const NavbarContainer = styled.nav`
   display: flex;
@@ -51,6 +52,12 @@ const WalletSection = styled.div`
   display: flex;
   align-items: center;
   position: relative;
+`;
+
+const WalletButtonGroup = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
 `;
 
 const WalletButton = styled.button`
@@ -249,8 +256,10 @@ const Navbar = () => {
     <>
       <NavbarContainer>
         <Logo>
-          <Link href="/" passHref>
-            🪨📄✂️ <span>Rock Paper Solana</span>
+          <Link href="/">
+            <a>
+              <span>Rock Paper Solana</span>
+            </a>
           </Link>
         </Logo>
         
@@ -258,104 +267,84 @@ const Navbar = () => {
           <Link href="/" passHref>
             <NavLink isActive={router.pathname === '/'}>Home</NavLink>
           </Link>
-          <Link href="/games" passHref>
-            <NavLink isActive={router.pathname === '/games' || router.pathname.startsWith('/game/')}>
-              Games
-            </NavLink>
+          <Link href="/game/minesweeper" passHref>
+            <NavLink isActive={router.pathname === '/game/minesweeper'}>Minesweeper</NavLink>
           </Link>
-          <Link href="/wallet" passHref>
-            <NavLink isActive={router.pathname === '/wallet'}>Wallet</NavLink>
-          </Link>
-          <Link href="/settings" passHref>
-            <NavLink isActive={router.pathname === '/settings'}>Settings</NavLink>
-          </Link>
-          <Link href="/about" passHref>
-            <NavLink isActive={router.pathname === '/about'}>About</NavLink>
-          </Link>
-          <Link href="/contact" passHref>
-            <NavLink isActive={router.pathname === '/contact'}>Contact</NavLink>
-          </Link>
-          <Link href="/help" passHref>
-            <NavLink isActive={router.pathname === '/help'}>Help</NavLink>
+          <Link href="/game/blackjack" passHref>
+            <NavLink isActive={router.pathname === '/game/blackjack'}>Blackjack</NavLink>
           </Link>
         </NavLinks>
         
         <WalletSection ref={dropdownRef}>
-          {connected ? (
-            <>
+          <WalletButtonGroup>
+            <CrossmintWalletButton />
+          
+            {connected ? (
               <BalanceDisplay onClick={toggleWalletDropdown}>
-                <Balance>{balance.toFixed(2)} SOL</Balance>
+                <Balance>
+                  {balance < 0.001 && balance > 0 
+                    ? balance.toExponential(2) 
+                    : balance.toFixed(4)
+                  } SOL
+                </Balance>
                 <WalletAddress>{formatWalletAddress(publicKey)}</WalletAddress>
                 <DropdownIcon>▼</DropdownIcon>
               </BalanceDisplay>
-              
-              {walletDropdownOpen && (
-                <WalletDropdown>
-                  <DropdownItem onClick={copyAddressToClipboard}>
-                    <DropdownIcon2>📋</DropdownIcon2> Copy Address
-                  </DropdownItem>
-                  <DropdownItem onClick={navigateToWallet}>
-                    <DropdownIcon2>👛</DropdownIcon2> Wallet Details
-                  </DropdownItem>
-                  <DropdownItem onClick={refreshBalance}>
-                    <DropdownIcon2>🔄</DropdownIcon2> Refresh Balance
-                  </DropdownItem>
-                  <DropdownItem onClick={handleDisconnect}>
-                    <DropdownIcon2>🔌</DropdownIcon2> Disconnect
-                  </DropdownItem>
-                </WalletDropdown>
-              )}
-            </>
-          ) : (
-            <WalletButton onClick={handleConnectWallet}>
-              Connect Wallet
-            </WalletButton>
-          )}
+            ) : (
+              <WalletButton onClick={handleConnectWallet}>
+                Connect Wallet
+              </WalletButton>
+            )}
+          </WalletButtonGroup>
           
-          <MobileMenuButton onClick={toggleMobileMenu}>
-            ☰
-          </MobileMenuButton>
+          {walletDropdownOpen && (
+            <WalletDropdown>
+              <DropdownItem onClick={copyAddressToClipboard}>
+                <DropdownIcon2>📋</DropdownIcon2> Copy Address
+              </DropdownItem>
+              <DropdownItem onClick={navigateToWallet}>
+                <DropdownIcon2>💰</DropdownIcon2> Wallet Details
+              </DropdownItem>
+              <DropdownItem onClick={handleDisconnect}>
+                <DropdownIcon2>🔌</DropdownIcon2> Disconnect
+              </DropdownItem>
+            </WalletDropdown>
+          )}
         </WalletSection>
+        
+        <MobileMenuButton onClick={toggleMobileMenu}>
+          {mobileMenuOpen ? '✕' : '☰'}
+        </MobileMenuButton>
       </NavbarContainer>
       
       {mobileMenuOpen && (
         <MobileMenu>
           <MobileNavLink>
-            <Link href="/" passHref>
-              <NavLink isActive={router.pathname === '/'}>Home</NavLink>
+            <Link href="/">
+              <a>Home</a>
             </Link>
           </MobileNavLink>
           <MobileNavLink>
-            <Link href="/games" passHref>
-              <NavLink isActive={router.pathname === '/games' || router.pathname.startsWith('/game/')}>
-                Games
-              </NavLink>
+            <Link href="/game/minesweeper">
+              <a>Minesweeper</a>
             </Link>
           </MobileNavLink>
           <MobileNavLink>
-            <Link href="/wallet" passHref>
-              <NavLink isActive={router.pathname === '/wallet'}>Wallet</NavLink>
+            <Link href="/game/blackjack">
+              <a>Blackjack</a>
             </Link>
           </MobileNavLink>
           <MobileNavLink>
-            <Link href="/settings" passHref>
-              <NavLink isActive={router.pathname === '/settings'}>Settings</NavLink>
-            </Link>
-          </MobileNavLink>
-          <MobileNavLink>
-            <Link href="/about" passHref>
-              <NavLink isActive={router.pathname === '/about'}>About</NavLink>
-            </Link>
-          </MobileNavLink>
-          <MobileNavLink>
-            <Link href="/contact" passHref>
-              <NavLink isActive={router.pathname === '/contact'}>Contact</NavLink>
-            </Link>
-          </MobileNavLink>
-          <MobileNavLink>
-            <Link href="/help" passHref>
-              <NavLink isActive={router.pathname === '/help'}>Help</NavLink>
-            </Link>
+            {connected ? (
+              <span onClick={toggleWalletDropdown}>
+                {balance < 0.001 && balance > 0 
+                  ? balance.toExponential(2) 
+                  : balance.toFixed(4)
+                } SOL - {formatWalletAddress(publicKey)}
+              </span>
+            ) : (
+              <span onClick={handleConnectWallet}>Connect Wallet</span>
+            )}
           </MobileNavLink>
         </MobileMenu>
       )}

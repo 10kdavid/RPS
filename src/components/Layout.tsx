@@ -216,6 +216,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     return `${address.slice(0, 4)}...${address.slice(-4)}`;
   };
   
+  // Format balance for display
+  const formatBalance = (bal: number): string => {
+    if (bal === 0) return "0.00";
+    if (bal < 0.001 && bal > 0) return bal.toExponential(2);
+    return bal.toFixed(4);
+  };
+  
   // Effect to handle wallet dropdown clicks outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -297,7 +304,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <HeaderActions>
           {connected ? (
             <WalletInfo onClick={toggleWalletDropdown} ref={dropdownRef} style={{ cursor: 'pointer', position: 'relative' }}>
-              {balance.toFixed(2)} SOL
+              {formatBalance(balance)} SOL
               <WalletAddress>{formatWalletAddress(publicKey)}</WalletAddress>
               <DropdownIcon>▼</DropdownIcon>
               

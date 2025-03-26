@@ -17,6 +17,109 @@ import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 // Import wallet adapter CSS
 require('@solana/wallet-adapter-react-ui/styles.css');
 
+// Define Helius RPC URL with API key
+const HELIUS_RPC_URL = 'https://mainnet.helius-rpc.com/?api-key=3b6552f4-0ce5-4800-b8b6-a1cc7480d494';
+// Define proxy RPC URL
+const PROXY_RPC_URL = '/api/solana/rpc';
+
+// Create a custom connection that uses our proxy
+class ProxyConnection extends Connection {
+  constructor() {
+    // Initialize with Helius URL but we'll override the fetch behavior
+    super(HELIUS_RPC_URL, 'confirmed');
+  }
+
+  async sendRpcRequest(method: string, params: any[]): Promise<any> {
+    try {
+      console.log(`Sending RPC request via proxy: ${method}`, params);
+      const response = await fetch(PROXY_RPC_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: Date.now(),
+          method,
+          params,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`RPC request failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(`Proxy RPC response:`, data);
+      
+      if (data.error) {
+        throw new Error(`RPC error: ${JSON.stringify(data.error)}`);
+      }
+
+      return data.result;
+    } catch (error) {
+      console.error('Proxy RPC request failed:', error);
+      throw error;
+    }
+  }
+
+  // Override the getBalance method to use our proxy
+  async getBalance(publicKey: any): Promise<number> {
+    try {
+      // Try the RPC proxy first
+      const result = await this.sendRpcRequest('getBalance', [publicKey.toBase58()]);
+      console.log(`Raw balance result from proxy:`, result, typeof result);
+      
+      // Ensure we have a valid number
+      if (result === null || result === undefined) {
+        console.warn('Received null or undefined balance, trying dedicated balance endpoint');
+        return this.getBalanceFromDedicatedEndpoint(publicKey.toBase58());
+      }
+      
+      // Convert to number if it's a string
+      const numericResult = typeof result === 'string' ? parseInt(result, 10) : Number(result);
+      
+      // Check for NaN
+      if (isNaN(numericResult)) {
+        console.warn(`Invalid balance value resulted in NaN: ${result}, trying dedicated balance endpoint`);
+        return this.getBalanceFromDedicatedEndpoint(publicKey.toBase58());
+      }
+      
+      return numericResult;
+    } catch (error) {
+      console.error('Error getting balance via proxy:', error);
+      return this.getBalanceFromDedicatedEndpoint(publicKey.toBase58());
+    }
+  }
+  
+  // Helper method to get balance from our dedicated endpoint
+  async getBalanceFromDedicatedEndpoint(address: string): Promise<number> {
+    try {
+      console.log(`Trying dedicated balance endpoint for ${address}`);
+      const response = await fetch(`/api/solana/balance/${address}`);
+      
+      if (!response.ok) {
+        throw new Error(`Balance endpoint failed: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log(`Dedicated balance endpoint response:`, data);
+      
+      if (data && typeof data.lamports === 'number') {
+        return data.lamports;
+      }
+      
+      throw new Error('Invalid response from balance endpoint');
+    } catch (error) {
+      console.error('Error getting balance from dedicated endpoint:', error);
+      return 0; // Last resort fallback
+    }
+  }
+}
+
+// Initialize our proxy connection
+const proxyConnection = new ProxyConnection();
+
 // Define wallet context interface
 export interface WalletContextValue {
   balance: number;
@@ -75,53 +178,69 @@ export const WalletContextProvider: React.FC<{ children: ReactNode }> = ({ child
 
   // Function to manually refresh the balance
   const refreshBalance = async (): Promise<void> => {
-    if (wallet.publicKey && connection) {
+    if (wallet.publicKey) {
       try {
-        // Create a direct connection to Solana mainnet for this specific call
-        const directConnection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+        // Try to get balance using our proxy connection
+        const walletBalance = await proxyConnection.getBalance(wallet.publicKey);
+        console.log("Raw wallet balance from proxy:", walletBalance);
         
-        // Try both connections to get balance
-        let walletBalance;
-        try {
-          walletBalance = await connection.getBalance(wallet.publicKey);
-        } catch (err) {
-          console.log("Primary connection failed, trying direct connection");
-          walletBalance = await directConnection.getBalance(wallet.publicKey);
-        }
+        // Safely calculate SOL balance
+        const solBalance = (walletBalance && !isNaN(walletBalance)) 
+          ? walletBalance / LAMPORTS_PER_SOL 
+          : 0;
+          
+        console.log("LAMPORTS_PER_SOL:", LAMPORTS_PER_SOL);
+        console.log("Calculated SOL balance:", solBalance);
         
-        const solBalance = walletBalance / LAMPORTS_PER_SOL;
         setBalance(solBalance);
-        console.log("Refreshed balance:", solBalance);
-      } catch (error) {
-        console.error('Error refreshing balance:', error);
+        console.log("Refreshed balance via proxy:", solBalance);
+      } catch (proxyError) {
+        console.error('Error refreshing balance via proxy:', proxyError);
+        
+        try {
+          // Fallback to direct connection if proxy fails
+          console.log("Proxy failed, trying direct connection");
+          const directConnection = new Connection(HELIUS_RPC_URL, 'confirmed');
+          const walletBalance = await directConnection.getBalance(wallet.publicKey);
+          console.log("Raw wallet balance from direct connection:", walletBalance);
+          
+          // Safely calculate SOL balance
+          const solBalance = (walletBalance && !isNaN(walletBalance)) 
+            ? walletBalance / LAMPORTS_PER_SOL 
+            : 0;
+            
+          setBalance(solBalance);
+          console.log("Refreshed balance via direct connection:", solBalance);
+        } catch (directError) {
+          console.error('Direct connection also failed:', directError);
+          
+          try {
+            // If all else fails, try the provided connection
+            console.log("All direct connections failed, trying provided connection");
+            const walletBalance = await connection.getBalance(wallet.publicKey);
+            console.log("Raw wallet balance from provided connection:", walletBalance);
+            
+            // Safely calculate SOL balance
+            const solBalance = (walletBalance && !isNaN(walletBalance)) 
+              ? walletBalance / LAMPORTS_PER_SOL 
+              : 0;
+              
+            setBalance(solBalance);
+            console.log("Refreshed balance via provided connection:", solBalance);
+          } catch (error) {
+            console.error('All balance refresh attempts failed:', error);
+            setBalance(0);
+          }
+        }
       }
     }
   };
 
   // Fetch wallet balance whenever the wallet is connected
   useEffect(() => {
-    if (wallet.publicKey && connection) {
+    if (wallet.publicKey) {
       const fetchBalance = async () => {
-        try {
-          // Create a direct connection to Solana mainnet for this specific call
-          const directConnection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-          
-          // Try both connections to get balance
-          let walletBalance;
-          try {
-            walletBalance = await connection.getBalance(wallet.publicKey!);
-          } catch (err) {
-            console.log("Primary connection failed, trying direct connection");
-            walletBalance = await directConnection.getBalance(wallet.publicKey!);
-          }
-          
-          const solBalance = walletBalance / LAMPORTS_PER_SOL;
-          setBalance(solBalance);
-          console.log("Updated balance:", solBalance);
-        } catch (error) {
-          console.error('Error fetching balance:', error);
-          setBalance(0);
-        }
+        await refreshBalance();
       };
 
       fetchBalance();
@@ -133,7 +252,7 @@ export const WalletContextProvider: React.FC<{ children: ReactNode }> = ({ child
     } else {
       setBalance(0);
     }
-  }, [wallet.publicKey, connection, wallet.connected]);
+  }, [wallet.publicKey, wallet.connected]);
 
   // Create context value object
   const contextValue: WalletContextValue = {
@@ -155,8 +274,8 @@ export const WalletContextProvider: React.FC<{ children: ReactNode }> = ({ child
 
 // Wallet provider wrapper component
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Use the most reliable public Solana RPC endpoint
-  const network = 'https://api.mainnet-beta.solana.com';
+  // Use the Helius RPC endpoint for the main connection
+  const network = HELIUS_RPC_URL;
   
   // Define supported wallet adapters
   const wallets = [
