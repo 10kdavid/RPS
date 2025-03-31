@@ -5,6 +5,32 @@ import { useWallet } from '@solana/wallet-adapter-react';
 // The deployed program ID you provided
 const ESCROW_PROGRAM_ID = 'cPmtN4KbNDNaVEuWWKczs7Va12KyDgJnYEhU8r2jfeG';
 
+// Array of fallback RPC endpoints for better reliability
+const RPC_ENDPOINTS = [
+  'https://api.devnet.solana.com',
+  '/api/proxy', // Local proxy to avoid CORS issues
+];
+
+// Helper function to get a working connection with fallbacks
+async function getWorkingConnection(commitment: 'confirmed' | 'finalized' = 'confirmed'): Promise<Connection> {
+  // Try each endpoint
+  for (const endpoint of RPC_ENDPOINTS) {
+    try {
+      const connection = new Connection(endpoint, commitment);
+      // Verify the connection works
+      await connection.getVersion();
+      console.log(`Connected to ${endpoint}`);
+      return connection;
+    } catch (error) {
+      console.warn(`Failed to connect to ${endpoint}:`, error);
+    }
+  }
+  
+  // If we reach here, all connections failed
+  console.error("All RPC endpoints failed");
+  throw new Error("Cannot connect to Solana RPC. Please try again later.");
+}
+
 // IDL (Interface Definition Language) for our program
 // This would typically be generated when you build your Anchor program
 const idl = {
@@ -107,16 +133,24 @@ const idl = {
   ]
 };
 
-// Initialize the Escrow Service
+// Initialize the Escrow Service with better error handling
 export class EscrowService {
-  private connection: Connection;
+  private connection: Connection | null = null;
   private programId: PublicKey;
   private wallet: any;
 
-  constructor(connection: Connection, wallet: any) {
+  constructor(connection: Connection | null, wallet: any) {
     this.connection = connection;
     this.programId = new PublicKey(ESCROW_PROGRAM_ID);
     this.wallet = wallet;
+  }
+  
+  // Get a connection, creating one if needed
+  private async getConnection(): Promise<Connection> {
+    if (!this.connection) {
+      this.connection = await getWorkingConnection();
+    }
+    return this.connection;
   }
 
   // Helper function to get the escrow account address
@@ -131,12 +165,19 @@ export class EscrowService {
     );
   }
 
-  // Create a new escrow for a game
+  // Create a new escrow for a game with better error reporting
   async createEscrowWallet(gameId: string): Promise<string> {
     try {
+      if (!this.wallet.publicKey) {
+        throw new Error("Wallet not connected. Please connect your wallet first.");
+      }
+      
+      // Get a reliable connection
+      const connection = await this.getConnection();
+      
       // Create Provider (anchor's wrapper around Connection + Wallet)
       const provider = new anchor.AnchorProvider(
-        this.connection,
+        connection,
         this.wallet,
         { commitment: 'confirmed' }
       );
@@ -164,23 +205,38 @@ export class EscrowService {
       return escrowAddress.toString();
     } catch (error) {
       console.error("Error creating escrow:", error);
+      if (error.message?.includes("Transaction simulation failed")) {
+        throw new Error("Transaction failed. You might need Solana devnet SOL.");
+      }
       throw error;
     }
   }
 
-  // Send funds to the escrow
+  // Send funds to the escrow with better error messages
   async sendToEscrow(gameId: string, escrowAddress: string, amount: number): Promise<any> {
     try {
+      if (!this.wallet.publicKey) {
+        throw new Error("Wallet not connected. Please connect your wallet first.");
+      }
+      
+      // Get a reliable connection
+      const connection = await this.getConnection();
+      
+      // Check wallet balance first
+      const balance = await connection.getBalance(this.wallet.publicKey);
+      const lamports = amount * anchor.web3.LAMPORTS_PER_SOL;
+      
+      if (balance < lamports + 5000) { // Add buffer for transaction fee
+        throw new Error(`Insufficient balance. You need at least ${amount + 0.000005} SOL.`);
+      }
+      
       const provider = new anchor.AnchorProvider(
-        this.connection,
+        connection,
         this.wallet,
         { commitment: 'confirmed' }
       );
       
       const program = new anchor.Program(idl as any, this.programId, provider);
-      
-      // Convert SOL to lamports
-      const lamports = amount * anchor.web3.LAMPORTS_PER_SOL;
       
       console.log(`Sending ${amount} SOL (${lamports} lamports) to escrow ${escrowAddress}`);
       
@@ -195,12 +251,24 @@ export class EscrowService {
         .rpc();
 
       console.log("Deposit transaction:", tx);
+      
+      // Return more detailed success info
       return { 
         success: true, 
-        signature: tx 
+        signature: tx,
+        amount: amount,
+        escrowAddress: escrowAddress
       };
     } catch (error) {
       console.error("Error sending to escrow:", error);
+      
+      // Provide better error messages
+      if (error.message?.includes("0x1")) {
+        throw new Error("Transaction failed. Make sure you have enough SOL on devnet.");
+      } else if (error.message?.includes("not match constraint")) {
+        throw new Error("Game ID doesn't match the escrow. Please check your game link.");
+      }
+      
       throw error;
     }
   }
@@ -346,10 +414,9 @@ export class EscrowService {
 // Hook to use the escrow service in React components
 export function useEscrowService() {
   const wallet = useWallet();
-  const connection = new Connection(process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com', 'confirmed');
   
-  // Create a new service instance
-  const escrowService = new EscrowService(connection, wallet);
+  // We'll get the connection later, so passing null initially
+  const escrowService = new EscrowService(null, wallet);
   
   // Return all the methods from the service
   return {

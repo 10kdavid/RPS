@@ -1,83 +1,83 @@
-# Deploying to Vercel
+# Deploying Rock Paper Solana to Vercel
 
-This guide will help you deploy your Rock Paper Solana application to Vercel using the GitHub integration method.
+This guide will help you deploy the Rock Paper Solana app to Vercel, ensuring the Minesweeper game works correctly with multiplayer and Solana escrow integration.
 
 ## Prerequisites
 
-1. A GitHub account
-2. A Vercel account (you can sign up at [vercel.com](https://vercel.com) using your GitHub account)
-3. Your Rock Paper Solana code pushed to a GitHub repository
+1. A [Vercel account](https://vercel.com/signup)
+2. A [Firebase project](https://console.firebase.google.com/) for multiplayer functionality
+3. Solana devnet SOL for testing (get from [Solana Faucet](https://faucet.solana.com/))
 
-## Step 1: Push Your Code to GitHub
+## Step 1: Prepare Your Environment Variables
 
-If you haven't already, create a repository on GitHub and push your code:
+1. Create a `.env` file based on the `.env.example` template
+2. Fill in your Firebase project details:
+   - Get these from your Firebase console under Project Settings
+   - Make sure Realtime Database is set up for multiplayer
+3. Use the Solana escrow program ID: `cPmtN4KbNDNaVEuWWKczs7Va12KyDgJnYEhU8r2jfeG`
 
-```bash
-# Initialize git if not already done
-git init
+## Step 2: Deploy to Vercel
 
-# Add all files
-git add .
+1. Push your project to GitHub
+2. Log in to Vercel and import your repository
+3. During setup, add these Environment Variables:
 
-# Commit your changes
-git commit -m "Ready for deployment"
-
-# Link to your GitHub repository
-git remote add origin https://github.com/yourusername/rock-paper-solana.git
-
-# Push to GitHub
-git push -u origin main
+```
+NEXT_PUBLIC_SOLANA_RPC_URL=https://api.devnet.solana.com
+NEXT_PUBLIC_ESCROW_PROGRAM_ID=cPmtN4KbNDNaVEuWWKczs7Va12KyDgJnYEhU8r2jfeG
+NEXT_PUBLIC_FIREBASE_API_KEY=your-firebase-api-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
+NEXT_PUBLIC_FIREBASE_DATABASE_URL=https://your-project-id-default-rtdb.firebaseio.com
 ```
 
-## Step 2: Connect to Vercel
+4. Deploy your project
+5. Note your Vercel URL (e.g., `your-project.vercel.app`)
 
-1. Log in to [Vercel](https://vercel.com)
-2. Click on the "Add New..." button and select "Project"
-3. Connect your GitHub account if you haven't already
-4. Select your Rock Paper Solana repository from the list
+## Step 3: Test Game Sharing
 
-## Step 3: Configure Deployment Settings
+1. Connect your Phantom wallet to Solana devnet
+2. Create a game in the Minesweeper section
+3. Note the generated game link
+4. Share this link with a friend
+5. Your friend should be able to join your game
 
-On the configuration page:
+## Step 4: Test Escrow Functionality
 
-1. **Framework Preset**: Select "Next.js"
-2. **Root Directory**: Leave as default (should be `/`)
-3. **Build Command**: Leave as default (should be `next build`)
-4. **Output Directory**: Leave as default (should be `.next`)
-5. **Environment Variables**: Add any environment variables your application needs
-
-## Step 4: Deploy
-
-1. Click "Deploy"
-2. Wait for the build and deployment to complete
-3. Vercel will show you the deployment URL when it's ready
-
-## Step 5: Set Up a Custom Domain (Optional)
-
-1. After deployment, go to the "Domains" section of your project settings
-2. Add your custom domain
-3. Follow Vercel's instructions to configure your DNS settings
+1. Ensure you have Solana devnet SOL in your wallet
+2. Create a game with a bet amount
+3. Fund the escrow when prompted
+4. When your friend joins, they should see an option to fund their side
+5. Play the game and verify the winner can claim rewards
 
 ## Troubleshooting
 
-If you encounter build errors:
+If you encounter issues:
 
-1. **Styled Components Issues**:
-   - Ensure your `next.config.js` has the proper `shouldForwardProp` configuration
-   - Check that all components with custom props use `withConfig`
+1. **Friend can't join game**: Check Firebase rules to make sure read/write is allowed
+2. **Solana transactions failing**: Make sure you have devnet SOL and check browser console
+3. **Environment variables not working**: Check for typos and redeploy
 
-2. **Missing Page Errors**:
-   - Make sure all files referenced in your routes exist
-   - Check for case sensitivity issues in imports
+## Firebase Security Rules
 
-3. **File Locking Issues**:
-   - If you're developing on Windows, ensure all Next.js processes are closed before building
-   - Use the Vercel GitHub integration which builds in a clean environment
+Make sure your Firebase Realtime Database has these rules:
 
-## Automatic Deployments
+```json
+{
+  "rules": {
+    "games": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}
+```
 
-Once set up, Vercel will automatically deploy whenever you push changes to your GitHub repository. This means you can focus on development and let Vercel handle the deployment process.
+## Note on Solana Escrow Contract
 
-## Using the Deployed Application
+The escrow contract is already deployed at address: `cPmtN4KbNDNaVEuWWKczs7Va12KyDgJnYEhU8r2jfeG`
 
-After deployment, you can share the Vercel URL with your friends to play together. All the multiplayer functionality will work as long as both players have access to the internet and can connect to the deployed application. 
+You don't need to deploy it again, just use this address in your environment variables. 

@@ -1072,10 +1072,15 @@ const MinesweeperGame: React.FC = () => {
     return newGrid;
   };
   
-  const generateGameLink = (id: string) => {
-    // Use hardcoded domain to ensure proper share links across environments
-    const baseUrl = "https://rockpapersolana.com";
-    return `${baseUrl}/game/minesweeper?id=${id}`;
+  const generateGameLink = (gameId: string): string => {
+    // Use the current origin if in browser, or fallback for server-side rendering
+    const baseUrl = typeof window !== 'undefined' 
+      ? window.location.origin 
+      : process.env.NEXT_PUBLIC_VERCEL_URL 
+        ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+        : 'https://rockpapersolana.com';
+    
+    return `${baseUrl}/game/minesweeper?id=${gameId}`;
   };
 
   const copyGameLink = async () => {
@@ -1101,9 +1106,9 @@ const MinesweeperGame: React.FC = () => {
       if (!connected || !publicKey) {
         console.log("No wallet connected");
         addGameMessage("⚠️ Please connect your wallet to create a game.");
-        return;
-      }
-      
+      return;
+    }
+    
       console.log("Creating game with wallet", publicKey.toString());
       
       // Create a new game session in Firebase with real player ID
@@ -1163,7 +1168,7 @@ const MinesweeperGame: React.FC = () => {
         
         // Update opponent info if someone joined
         if (data.opponent && !hasOpponent) {
-          setHasOpponent(true);
+      setHasOpponent(true);
           setOpponentAddress(data.opponent);
           setGameState(GameStateEnum.PLAYING);
           addGameMessage(`Opponent ${data.opponent.substring(0, 6)}... joined the game!`);
@@ -1241,9 +1246,9 @@ const MinesweeperGame: React.FC = () => {
     try {
       if (!id) {
         addGameMessage("Please enter a game ID");
-        return;
-      }
-      
+      return;
+    }
+    
       if (!connected || !publicKey) {
         addGameMessage("⚠️ Please connect your wallet to join a game.");
         return;

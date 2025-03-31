@@ -1,34 +1,34 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: false,
+  reactStrictMode: true,
   compiler: {
-    styledComponents: {
-      displayName: true,
-      ssr: true,
-      minify: true,
-    },
+    styledComponents: true,
   },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  // Add security headers but ensure Firebase connections work
   async headers() {
     return [
       {
-        source: '/:path*',
+        source: '/(.*)',
         headers: [
           {
-            key: 'Cache-Control',
-            value: 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            key: 'Content-Security-Policy',
+            value: "default-src 'self'; connect-src 'self' https://api.devnet.solana.com https://*.firebaseio.com https://*.googleapis.com https://*.helius.xyz wss://*.firebaseio.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; frame-src 'self';"
           },
           {
-            key: 'Content-Security-Policy',
-            value: "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-eval' 'unsafe-inline' *.firebaseio.com; connect-src 'self' *.firebaseio.com *.firebase.com *.firebase.googleapis.com *.solana.com firebase.googleapis.com firebaseinstallations.googleapis.com identitytoolkit.googleapis.com; img-src 'self' data:; frame-ancestors 'self' https://*.vercel.app https://*.rockpapersolana.com;",
+            key: 'Access-Control-Allow-Origin',
+            value: '*'
           },
-        ],
-      },
-    ];
-  },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET, POST, OPTIONS'
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'Content-Type, Authorization'
+          }
+        ]
+      }
+    ]
+  }
 }
 
 module.exports = nextConfig 
