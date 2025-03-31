@@ -16,11 +16,15 @@
     "deploy-css-fix": "cross-env NODE_ENV=production NEXT_PUBLIC_STYLED_JSX=true npm run safe-build"
   },
   "dependencies": {
+    "@project-serum/anchor": "^0.26.0",
+    "@solana/spl-token": "^0.4.13",
     "@solana/wallet-adapter-base": "^0.9.23",
     "@solana/wallet-adapter-react": "^0.15.35",
     "@solana/wallet-adapter-react-ui": "^0.9.34",
     "@solana/wallet-adapter-wallets": "^0.19.23",
-    "@solana/web3.js": "^1.78.5",
+    "@solana/web3.js": "^1.98.0",
+    "bn.js": "^5.2.1",
+    "buffer-layout": "^1.2.2",
     "firebase": "^11.5.0",
     "next": "^14.0.1",
     "react": "^18.2.0",

@@ -1,5 +1,5 @@
 import { Connection, PublicKey, Transaction, SystemProgram, Keypair, sendAndConfirmTransaction } from '@solana/web3.js';
-import { AnchorProvider, Program, web3, BN } from '@project-serum/anchor';
+import * as anchor from '@project-serum/anchor';
 import { useWallet } from '@solana/wallet-adapter-react';
 
 // The deployed program ID you provided
@@ -134,16 +134,20 @@ export class EscrowService {
   // Create a new escrow for a game
   async createEscrowWallet(gameId: string): Promise<string> {
     try {
-      const provider = new AnchorProvider(
+      // Create Provider (anchor's wrapper around Connection + Wallet)
+      const provider = new anchor.AnchorProvider(
         this.connection,
         this.wallet,
         { commitment: 'confirmed' }
       );
 
-      const program = new Program(idl as any, this.programId, provider);
+      // Create a program interface from the IDL
+      const program = new anchor.Program(idl as any, this.programId, provider);
       
       // Get the escrow PDA
       const [escrowAddress, bump] = await this.getEscrowAddress(gameId, this.wallet.publicKey);
+      
+      console.log("Creating escrow at address:", escrowAddress.toString());
       
       // Call the initialize_escrow instruction
       const tx = await program.methods
@@ -156,7 +160,6 @@ export class EscrowService {
         .rpc();
 
       console.log("Escrow created with transaction:", tx);
-      console.log("Escrow address:", escrowAddress.toString());
       
       return escrowAddress.toString();
     } catch (error) {
@@ -168,20 +171,22 @@ export class EscrowService {
   // Send funds to the escrow
   async sendToEscrow(gameId: string, escrowAddress: string, amount: number): Promise<any> {
     try {
-      const provider = new AnchorProvider(
+      const provider = new anchor.AnchorProvider(
         this.connection,
         this.wallet,
         { commitment: 'confirmed' }
       );
       
-      const program = new Program(idl as any, this.programId, provider);
+      const program = new anchor.Program(idl as any, this.programId, provider);
       
       // Convert SOL to lamports
-      const lamports = amount * web3.LAMPORTS_PER_SOL;
+      const lamports = amount * anchor.web3.LAMPORTS_PER_SOL;
+      
+      console.log(`Sending ${amount} SOL (${lamports} lamports) to escrow ${escrowAddress}`);
       
       // Call the deposit instruction
       const tx = await program.methods
-        .deposit(gameId, new BN(lamports))
+        .deposit(gameId, new anchor.BN(lamports))
         .accounts({
           player: this.wallet.publicKey,
           escrow: new PublicKey(escrowAddress),
@@ -203,13 +208,15 @@ export class EscrowService {
   // Join an existing escrow as player 2
   async joinEscrow(gameId: string, escrowAddress: string): Promise<any> {
     try {
-      const provider = new AnchorProvider(
+      const provider = new anchor.AnchorProvider(
         this.connection,
         this.wallet,
         { commitment: 'confirmed' }
       );
       
-      const program = new Program(idl as any, this.programId, provider);
+      const program = new anchor.Program(idl as any, this.programId, provider);
+      
+      console.log(`Joining escrow for game ${gameId} at address ${escrowAddress}`);
       
       // Call the join_escrow instruction
       const tx = await program.methods
@@ -235,13 +242,15 @@ export class EscrowService {
   // Set the winner of the game
   async setWinner(gameId: string, escrowAddress: string, winnerAddress: string): Promise<any> {
     try {
-      const provider = new AnchorProvider(
+      const provider = new anchor.AnchorProvider(
         this.connection,
         this.wallet,
         { commitment: 'confirmed' }
       );
       
-      const program = new Program(idl as any, this.programId, provider);
+      const program = new anchor.Program(idl as any, this.programId, provider);
+      
+      console.log(`Setting winner ${winnerAddress} for game ${gameId}`);
       
       // Call the set_winner instruction
       const tx = await program.methods
@@ -272,13 +281,15 @@ export class EscrowService {
         throw new Error("Only the winner can claim funds");
       }
       
-      const provider = new AnchorProvider(
+      const provider = new anchor.AnchorProvider(
         this.connection,
         this.wallet,
         { commitment: 'confirmed' }
       );
       
-      const program = new Program(idl as any, this.programId, provider);
+      const program = new anchor.Program(idl as any, this.programId, provider);
+      
+      console.log(`Claiming funds for game ${gameId} as ${winnerAddress}`);
       
       // Call the claim_funds instruction
       const tx = await program.methods
@@ -305,7 +316,7 @@ export class EscrowService {
   async getEscrowBalance(escrowAddress: string): Promise<number> {
     try {
       const balance = await this.connection.getBalance(new PublicKey(escrowAddress));
-      return balance / web3.LAMPORTS_PER_SOL;
+      return balance / anchor.web3.LAMPORTS_PER_SOL;
     } catch (error) {
       console.error("Error getting escrow balance:", error);
       throw error;
@@ -315,13 +326,13 @@ export class EscrowService {
   // Get the full state of an escrow
   async getEscrowState(gameId: string, creator: PublicKey): Promise<any> {
     try {
-      const provider = new AnchorProvider(
+      const provider = new anchor.AnchorProvider(
         this.connection,
         this.wallet,
         { commitment: 'confirmed' }
       );
       
-      const program = new Program(idl as any, this.programId, provider);
+      const program = new anchor.Program(idl as any, this.programId, provider);
       const [escrowAddress] = await this.getEscrowAddress(gameId, creator);
       
       return await program.account.escrow.fetch(escrowAddress);
@@ -337,8 +348,10 @@ export function useEscrowService() {
   const wallet = useWallet();
   const connection = new Connection(process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com', 'confirmed');
   
+  // Create a new service instance
   const escrowService = new EscrowService(connection, wallet);
   
+  // Return all the methods from the service
   return {
     createEscrowWallet: escrowService.createEscrowWallet.bind(escrowService),
     sendToEscrow: escrowService.sendToEscrow.bind(escrowService),
