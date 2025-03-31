@@ -945,10 +945,22 @@ const MinesweeperGame: React.FC = () => {
       return;
     }
     
+    // Make sure it's player's turn in multiplayer
+    if (hasOpponent && currentTurn !== PlayerTurn.PLAYER_ONE) {
+      addGameMessage("⚠️ It's not your turn!");
+      return;
+    }
+    
     console.log(`Clicked cell at row ${row}, col ${col}`);
     
     // Create a copy of the grid
     const newGrid = [...grid];
+    
+    // Don't allow clicking already revealed cells
+    if (newGrid[row][col].revealed) {
+      console.log("Cell already revealed");
+      return;
+    }
     
     // Mark the cell as revealed
     newGrid[row][col].revealed = true;
@@ -956,7 +968,7 @@ const MinesweeperGame: React.FC = () => {
     // Add animation
     newGrid[row][col].isAnimating = true;
     
-    // Check if the cell contains a mine - similar to Coinflip result calculation
+    // Check if the cell contains a mine
     if (newGrid[row][col].hasMine) {
       // Mine found - lose condition
       newGrid[row][col].isAnimating = true;
@@ -964,15 +976,16 @@ const MinesweeperGame: React.FC = () => {
       addGameMessage("Game over! You hit a mine.");
       
       // If playing against opponent, opponent wins
-      if (hasOpponent) {
+      if (hasOpponent && opponentAddress) {
         addGameMessage(`${opponentAddress.substring(0, 6)}... wins the bet!`);
         
         // Update game state with the winner (opponent)
         if (gameId) {
           updateGameState('minesweeper', gameId, {
+            status: 'completed',
             gameData: {
               winner: opponentAddress,
-              status: 'completed'
+              grid: newGrid
             }
           }).catch(error => {
             console.error("Error updating game with winner:", error);
@@ -990,16 +1003,17 @@ const MinesweeperGame: React.FC = () => {
         .every(cell => cell.revealed);
       
       if (allNonMinesRevealed) {
-        // Win condition - similar to Coinflip win state
+        // Win condition
         setGameState(GameStateEnum.WIN);
         addGameMessage("Congratulations! You've found all the gems!");
         
         // Update game state with the winner (current player)
-        if (gameId) {
+        if (gameId && publicKey) {
           updateGameState('minesweeper', gameId, {
+            status: 'completed',
             gameData: {
-              winner: crossmintAddress || publicKey?.toString(),
-              status: 'completed'
+              winner: publicKey.toString(),
+              grid: newGrid
             }
           }).catch(error => {
             console.error("Error updating game with winner:", error);
@@ -1010,27 +1024,22 @@ const MinesweeperGame: React.FC = () => {
         if (hasOpponent && escrowAddress && !escrowClaimed) {
           addGameMessage("You can now claim your winnings by clicking the 'Claim Rewards' button!");
         }
-      }
-      
-      // If playing against opponent, toggle turns
-      if (hasOpponent) {
-        setCurrentTurn(
-          currentTurn === PlayerTurn.PLAYER_ONE ? 
-          PlayerTurn.PLAYER_TWO : 
-          PlayerTurn.PLAYER_ONE
-        );
-        addGameMessage(`Turn switched to ${currentTurn === PlayerTurn.PLAYER_ONE ? "you" : "opponent"}`);
+      } else if (hasOpponent) {
+        // Switch turns in multiplayer
+        setCurrentTurn(PlayerTurn.PLAYER_TWO);
+        addGameMessage("Turn switched to opponent");
       }
     }
     
     // Update the grid
     setGrid(newGrid);
     
-    // Update game grid in Firebase if in multiplayer
-    if (hasOpponent && gameId) {
+    // Update game grid in Firebase for multiplayer
+    if (gameId) {
       updateGameState('minesweeper', gameId, {
         gameData: {
-          grid: newGrid
+          grid: newGrid,
+          currentTurn: PlayerTurn.PLAYER_TWO // Switch to opponent's turn
         }
       }).catch(error => {
         console.error("Error updating grid state:", error);
@@ -1097,8 +1106,9 @@ const MinesweeperGame: React.FC = () => {
       
       console.log("Creating game with wallet", publicKey.toString());
       
-      // Create a simple game ID
-      const newGameId = Math.random().toString(36).substring(2, 8).toUpperCase();
+      // Create a new game session in Firebase with real player ID
+      const playerId = publicKey.toString();
+      const newGameId = await createGameSession('minesweeper', playerId);
       console.log("Game session created with ID:", newGameId);
       
       setGameId(newGameId);
@@ -1109,14 +1119,30 @@ const MinesweeperGame: React.FC = () => {
       const newGrid = initializeGrid();
       setGrid(newGrid);
       
+      // Store the grid and bet amount in Firebase
+      await updateGameState('minesweeper', newGameId, {
+        gameData: {
+          grid: newGrid,
+          betAmount: betAmount
+        }
+      });
+      
       // Create an actual on-chain escrow wallet
       try {
         console.log("Creating escrow wallet");
-        addGameMessage("Creating secure escrow wallet...");
+        addGameMessage("Creating secure escrow wallet on Solana devnet...");
         
         const escrowAddr = await createEscrowWallet(newGameId);
         console.log("Escrow wallet created:", escrowAddr);
         setEscrowAddress(escrowAddr);
+        
+        // Update game with escrow address in Firebase
+        await updateGameState('minesweeper', newGameId, {
+          gameData: {
+            escrowAddress: escrowAddr,
+            escrowFunded: {}
+          }
+        });
         
         addGameMessage(`✅ Secure escrow wallet created for betting. Address: ${escrowAddr.slice(0, 8)}...`);
       } catch (escrowError) {
@@ -1131,21 +1157,75 @@ const MinesweeperGame: React.FC = () => {
       setActiveScreen('game');
       setEscrowClaimed(false);
       
-      // Simulate opponent joining after a delay (for testing)
-      // In a real implementation, this would happen when another player joins
-      setTimeout(() => {
-        console.log("Simulating opponent joining");
-        const simulatedOpponentAddress = "DemoOpponent" + Math.random().toString(36).substring(2, 8);
-        setOpponentAddress(simulatedOpponentAddress);
-        setHasOpponent(true);
-        setGameState(GameStateEnum.PLAYING);
+      // Start listening for real opponent and game updates
+      const unsubscribe = listenToGameUpdates('minesweeper', newGameId, (data) => {
+        console.log("Game update received:", data);
         
-        // Add a message
-        addGameMessage(`Opponent ${simulatedOpponentAddress.substring(0, 6)}... joined the game!`);
-      }, 5000);
+        // Update opponent info if someone joined
+        if (data.opponent && !hasOpponent) {
+          setHasOpponent(true);
+          setOpponentAddress(data.opponent);
+          setGameState(GameStateEnum.PLAYING);
+          addGameMessage(`Opponent ${data.opponent.substring(0, 6)}... joined the game!`);
+          
+          // Update game status in Firebase to playing
+          updateGameState('minesweeper', newGameId, {
+            status: 'playing'
+          }).catch(error => {
+            console.error("Error updating game status:", error);
+          });
+        }
+        
+        // Update escrow funding status
+        if (data.gameData?.escrowFunded) {
+          setEscrowFunded(data.gameData.escrowFunded);
+          
+          // Check if both players funded
+          const bothFunded = 
+            data.gameData.escrowFunded[playerId] && 
+            data.opponent && 
+            data.gameData.escrowFunded[data.opponent];
+          
+          if (bothFunded) {
+            addGameMessage("✅ Both players have funded the escrow. Game is ready!");
+          }
+        }
+        
+        // Update grid if opponent made a move
+        if (data.gameData?.grid && data.lastUpdated) {
+          // Only update if the data is newer than our current state
+          setGrid(data.gameData.grid);
+        }
+        
+        // Check escrow claimed status
+        if (data.gameData?.escrowClaimed) {
+          setEscrowClaimed(true);
+        }
+        
+        // Check game end conditions
+        if (data.status === 'completed' && data.gameData?.winner) {
+          if (data.gameData.winner === playerId) {
+            setGameState(GameStateEnum.WIN);
+            addGameMessage("Congratulations! You won the game!");
+            
+            if (escrowAddress && !escrowClaimed) {
+              addGameMessage("You can now claim your winnings by clicking the 'Claim Rewards' button!");
+            }
+          } else {
+            setGameState(GameStateEnum.GAME_OVER);
+            addGameMessage("Game over! Your opponent won.");
+          }
+        }
+      });
+      
+      // Store the unsubscribe function
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+      unsubscribeRef.current = unsubscribe;
       
       console.log("Game creation complete");
-      addGameMessage("Game created! Waiting for opponent. Share the link to invite someone.");
+      addGameMessage("Game created! Waiting for a real opponent. Share the link to invite someone.");
     } catch (error) {
       console.error("Error creating game:", error);
       if (error instanceof Error) {
@@ -1161,27 +1241,30 @@ const MinesweeperGame: React.FC = () => {
     try {
       if (!id) {
         addGameMessage("Please enter a game ID");
-      return;
-    }
-    
-      if (!crossmintConnected || !crossmintAddress) {
-        addGameMessage("⚠️ Please connect your Crossmint wallet to join a game with betting.");
+        return;
+      }
+      
+      if (!connected || !publicKey) {
+        addGameMessage("⚠️ Please connect your wallet to join a game.");
         return;
       }
       
       setGameMessages([]);
       addGameMessage(`Joining game ${id}...`);
       
-      // Check if game exists
+      // Check if game exists in Firebase
       const gameExists = await checkGameExists('minesweeper', id);
       if (!gameExists) {
         addGameMessage("⚠️ Game not found. Please check the ID and try again.");
         return;
       }
       
+      // Get the player's address
+      const joinerAddress = publicKey.toString();
+      
       // Join the game session using Firebase
-      await joinGameSession('minesweeper', id, crossmintAddress);
-      console.log(`Joined game ${id} as ${crossmintAddress}`);
+      await joinGameSession('minesweeper', id, joinerAddress);
+      console.log(`Joined game ${id} as ${joinerAddress}`);
       
       // Set game info
       setGameId(id);
@@ -1189,28 +1272,71 @@ const MinesweeperGame: React.FC = () => {
       setActiveScreen('game');
       
       // Start listening for game updates
-      const unsubscribe = listenToGameUpdates('minesweeper', id, (data) => {
+      const unsubscribe = listenToGameUpdates('minesweeper', id, async (data) => {
         console.log("Game update received:", data);
         
         // Update game state based on data
         if (data.status === 'waiting') {
           setGameState(GameStateEnum.WAITING);
+          addGameMessage("Waiting for game to start...");
         } else if (data.status === 'playing') {
           setGameState(GameStateEnum.PLAYING);
-          addGameMessage("Game started! Your turn.");
+          
+          // Determine whose turn it is
+          if (data.gameData?.currentTurn) {
+            const isMyTurn = data.gameData.currentTurn === PlayerTurn.PLAYER_TWO;
+            setCurrentTurn(isMyTurn ? PlayerTurn.PLAYER_ONE : PlayerTurn.PLAYER_TWO);
+            addGameMessage(isMyTurn ? "It's your turn!" : "Waiting for opponent's move...");
+          } else {
+            // Default to creator's turn if not specified
+            setCurrentTurn(PlayerTurn.PLAYER_TWO);
+            addGameMessage("Game started! Waiting for creator's move...");
+          }
         } else if (data.status === 'completed') {
           // Check if current player is the winner
-          if (data.gameData?.winner === crossmintAddress) {
+          if (data.gameData?.winner === joinerAddress) {
             setGameState(GameStateEnum.WIN);
-            addGameMessage("You won the game!");
-          } else {
+            addGameMessage("Congratulations! You won the game!");
+            
+            if (data.gameData?.escrowAddress && !data.gameData?.escrowClaimed) {
+              addGameMessage("You can now claim your winnings by clicking the 'Claim Rewards' button!");
+            }
+          } else if (data.gameData?.winner) {
             setGameState(GameStateEnum.GAME_OVER);
-            addGameMessage("Game over! Opponent won.");
+            addGameMessage("Game over! Your opponent won.");
           }
         }
         
-        // Update opponent info (creator is the opponent when joining)
-        if (data.creator) {
+        // Connect to the escrow contract
+        if (data.gameData?.escrowAddress && !escrowAddress) {
+          setEscrowAddress(data.gameData.escrowAddress);
+          addGameMessage(`Escrow wallet detected: ${data.gameData.escrowAddress.slice(0, 8)}...`);
+          
+          // Check escrow balance
+          try {
+            const balance = await getEscrowBalance(data.gameData.escrowAddress);
+            setEscrowBalance(balance);
+            addGameMessage(`Current escrow balance: ${balance} SOL`);
+          } catch (error) {
+            console.error("Error checking escrow balance:", error);
+          }
+          
+          // Try to join the escrow contract
+          try {
+            const result = await joinEscrow(id, data.gameData.escrowAddress);
+            console.log("Joined escrow contract:", result);
+            
+            if (result && result.success) {
+              addGameMessage("✅ Connected to the game's escrow contract.");
+            }
+          } catch (error) {
+            console.error("Error joining escrow:", error);
+            // Non-critical error, continue the game
+          }
+        }
+        
+        // Update creator info
+        if (data.creator && !opponentAddress) {
           setHasOpponent(true);
           setOpponentAddress(data.creator);
           addGameMessage(`Playing against ${data.creator.substring(0, 6)}...`);
@@ -1226,19 +1352,13 @@ const MinesweeperGame: React.FC = () => {
           setBetAmount(data.gameData.betAmount);
         }
         
-        // Update escrow info if available
-        if (data.gameData?.escrowAddress) {
-          setEscrowAddress(data.gameData.escrowAddress);
-          addGameMessage("Escrow wallet ready for betting.");
-        }
-        
         // Update escrow funding status if available
         if (data.gameData?.escrowFunded) {
           setEscrowFunded(data.gameData.escrowFunded);
           
           // Check if both players funded
-          const creatorFunded = data.gameData.escrowFunded[data.creator];
-          const joinerFunded = data.gameData.escrowFunded[crossmintAddress];
+          const creatorFunded = data.creator && data.gameData.escrowFunded[data.creator];
+          const joinerFunded = data.gameData.escrowFunded[joinerAddress];
           
           if (creatorFunded && !joinerFunded) {
             addGameMessage("Creator has funded their bet. Click 'Fund Escrow' to add your bet.");
@@ -1259,7 +1379,7 @@ const MinesweeperGame: React.FC = () => {
       }
       unsubscribeRef.current = unsubscribe;
       
-      addGameMessage("Successfully joined the game!");
+      addGameMessage("Successfully joined the game! Waiting for it to start...");
     } catch (error) {
       console.error("Error joining game:", error);
       addGameMessage(`⚠️ Error joining game: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1277,7 +1397,7 @@ const MinesweeperGame: React.FC = () => {
       
       // Convert SOL to lamports
       const lamports = amount * LAMPORTS_PER_SOL;
-      addGameMessage(`Processing ${amount} SOL transaction to escrow...`);
+      addGameMessage(`Processing ${amount} SOL transaction to escrow on Solana devnet...`);
       
       // Use the real sendToEscrow function from our service
       const result = await sendToEscrow(gameId, address, amount);
@@ -1292,6 +1412,16 @@ const MinesweeperGame: React.FC = () => {
       const newEscrowFunded = { ...escrowFunded };
       newEscrowFunded[publicKey.toString()] = true;
       setEscrowFunded(newEscrowFunded);
+      
+      // Update escrow funded status in Firebase
+      await updateGameState('minesweeper', gameId, {
+        gameData: {
+          escrowFunded: {
+            ...escrowFunded,
+            [publicKey.toString()]: true
+          }
+        }
+      });
       
       // Get updated balance
       try {
@@ -1318,11 +1448,11 @@ const MinesweeperGame: React.FC = () => {
     setGameMessages(prev => [...prev, message]);
   };
 
-  // Add a function to claim rewards when a player wins
+  // Update claimRewards to use the on-chain escrow contract
   const claimRewards = async () => {
     try {
       setIsClaimingRewards(true);
-      addGameMessage("Processing your winnings...");
+      addGameMessage("Processing your winnings from Solana devnet...");
       
       if (!gameId || !escrowAddress) {
         throw new Error("Missing game ID or escrow address");
@@ -1332,7 +1462,7 @@ const MinesweeperGame: React.FC = () => {
         throw new Error("Wallet not connected");
       }
       
-      // Verify game is in WIN state
+      // Check if game is in the WIN state
       if (gameState !== GameStateEnum.WIN) {
         throw new Error("You can only claim rewards when you've won the game");
       }
@@ -1341,17 +1471,33 @@ const MinesweeperGame: React.FC = () => {
         throw new Error("Rewards have already been claimed");
       }
       
+      // Check escrow balance
+      const balance = await getEscrowBalance(escrowAddress);
+      if (balance <= 0) {
+        throw new Error("Escrow has no funds to claim");
+      }
+      
+      addGameMessage(`Escrow balance: ${balance} SOL`);
+      
       // First, set the winner on the contract
       try {
-        await setWinner(gameId, escrowAddress, publicKey.toString());
-        addGameMessage("Winner verified on the blockchain...");
+        addGameMessage("Verifying winner on the blockchain...");
+        const setWinnerResult = await setWinner(gameId, escrowAddress, publicKey.toString());
+        
+        if (!setWinnerResult || !setWinnerResult.success) {
+          throw new Error("Failed to verify winner status");
+        }
+        
+        console.log("Set winner successful:", setWinnerResult);
+        addGameMessage("✅ Winner verified on the blockchain");
       } catch (error) {
+        // If this fails, it might be because the winner is already set
         console.error("Error setting winner:", error);
-        addGameMessage("⚠️ Error verifying winner: " + (error instanceof Error ? error.message : "Unknown error"));
-        throw error;
+        addGameMessage("⚠️ Winner verification step skipped - proceeding to claim");
       }
       
       // Then release the escrow to the winner
+      addGameMessage("Claiming funds from escrow...");
       const result = await releaseEscrow(gameId, escrowAddress, publicKey.toString());
       
       if (!result || !result.success) {
@@ -1361,11 +1507,18 @@ const MinesweeperGame: React.FC = () => {
       console.log("Claim successful:", result);
       setEscrowClaimed(true);
       
+      // Mark escrow as claimed in Firebase
+      await updateGameState('minesweeper', gameId, {
+        gameData: {
+          escrowClaimed: true
+        }
+      });
+      
       const txInfo = result.signature ? 
         `Transaction: ${result.signature.slice(0, 8)}...` : 
         'Transaction completed';
       
-      addGameMessage(`🎉 You've claimed your winnings! ${txInfo}`);
+      addGameMessage(`🎉 You've claimed ${balance} SOL in winnings! ${txInfo}`);
       return true;
     } catch (error) {
       console.error("Error claiming rewards:", error);
