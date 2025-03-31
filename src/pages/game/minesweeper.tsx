@@ -14,6 +14,7 @@ import {
   updateGameState,
   checkGameExists
 } from '../../utils/firebase';
+import { useEscrowService } from '../../services/escrow';
 
 // Game States & Types
 enum GameStateEnum {
@@ -894,13 +895,17 @@ const BottomSection = styled.div`
 const MinesweeperGame: React.FC = () => {
   const router = useRouter();
   const { publicKey, connected } = useWallet();
+  const {
+    createEscrowWallet,
+    sendToEscrow,
+    joinEscrow,
+    setWinner,
+    releaseEscrow,
+    getEscrowBalance
+  } = useEscrowService();
   const { 
     connected: crossmintConnected, 
     walletAddress: crossmintAddress,
-    createEscrowWallet,
-    sendToEscrow,
-    releaseEscrow,
-    getEscrowBalance
   } = useCrossmintWallet();
   
   // Game state
@@ -1084,16 +1089,13 @@ const MinesweeperGame: React.FC = () => {
       console.log("Create game button clicked");
       setGameMessages([]);
       
-      // Allow either wallet type
-      if (!connected && !crossmintConnected) {
-        console.log("No wallet connected - connected:", connected, "crossmintConnected:", crossmintConnected);
+      if (!connected || !publicKey) {
+        console.log("No wallet connected");
         addGameMessage("⚠️ Please connect your wallet to create a game.");
-      return;
-    }
-    
-      // Use whatever wallet is connected
-      const playerAddress = publicKey?.toString() || crossmintAddress || 'anonymous';
-      console.log("Creating game with wallet", playerAddress);
+        return;
+      }
+      
+      console.log("Creating game with wallet", publicKey.toString());
       
       // Create a simple game ID
       const newGameId = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -1107,36 +1109,19 @@ const MinesweeperGame: React.FC = () => {
       const newGrid = initializeGrid();
       setGrid(newGrid);
       
-      // For Phantom wallet, implement direct Solana transaction
-      if (connected && publicKey) {
-        console.log("Using Phantom wallet for game creation");
-        try {
-          // For now, we'll create a simulated escrow for Phantom
-          const simulatedEscrowAddress = `escrow_${newGameId}`;
-          setEscrowAddress(simulatedEscrowAddress);
-          console.log("Simulated escrow created:", simulatedEscrowAddress);
-          addGameMessage("✅ Game created with Phantom wallet. Escrow simulation enabled.");
-        } catch (error) {
-          console.error("Error with Phantom wallet:", error);
-          addGameMessage("⚠️ Could not set up wallet. Game will continue without betting.");
-        }
-      } 
-      // For Crossmint wallet, use their API
-      else if (crossmintConnected && createEscrowWallet) {
-        console.log("Using Crossmint wallet for game creation");
-        try {
-          console.log("Creating escrow wallet");
-          const escrowAddr = await createEscrowWallet(newGameId);
-          console.log("Escrow wallet created:", escrowAddr);
-          setEscrowAddress(escrowAddr);
-          addGameMessage("✅ Secure escrow wallet created for betting with Crossmint.");
-        } catch (escrowError) {
-          console.error("Error creating escrow:", escrowError);
-          addGameMessage("⚠️ Could not create escrow wallet. Game will continue without secure betting.");
-        }
-      } else {
-        console.log("No suitable wallet available for escrow");
-        addGameMessage("⚠️ No secure betting available with your current wallet.");
+      // Create an actual on-chain escrow wallet
+      try {
+        console.log("Creating escrow wallet");
+        addGameMessage("Creating secure escrow wallet...");
+        
+        const escrowAddr = await createEscrowWallet(newGameId);
+        console.log("Escrow wallet created:", escrowAddr);
+        setEscrowAddress(escrowAddr);
+        
+        addGameMessage(`✅ Secure escrow wallet created for betting. Address: ${escrowAddr.slice(0, 8)}...`);
+      } catch (escrowError) {
+        console.error("Error creating escrow:", escrowError);
+        addGameMessage("⚠️ Could not create escrow wallet. Game will continue without secure betting.");
       }
       
       // Set game state
@@ -1146,12 +1131,13 @@ const MinesweeperGame: React.FC = () => {
       setActiveScreen('game');
       setEscrowClaimed(false);
       
-      // Simulate opponent joining after a delay
-    setTimeout(() => {
+      // Simulate opponent joining after a delay (for testing)
+      // In a real implementation, this would happen when another player joins
+      setTimeout(() => {
         console.log("Simulating opponent joining");
         const simulatedOpponentAddress = "DemoOpponent" + Math.random().toString(36).substring(2, 8);
         setOpponentAddress(simulatedOpponentAddress);
-      setHasOpponent(true);
+        setHasOpponent(true);
         setGameState(GameStateEnum.PLAYING);
         
         // Add a message
@@ -1162,7 +1148,6 @@ const MinesweeperGame: React.FC = () => {
       addGameMessage("Game created! Waiting for opponent. Share the link to invite someone.");
     } catch (error) {
       console.error("Error creating game:", error);
-      // Display more detailed error information
       if (error instanceof Error) {
         addGameMessage(`⚠️ Error creating game: ${error.message}`);
         console.error("Error stack:", error.stack);
@@ -1285,52 +1270,43 @@ const MinesweeperGame: React.FC = () => {
     try {
       console.log(`Funding escrow ${address} with ${amount} SOL for game ${gameId}`);
       
-      // Convert SOL to lamports for transaction
-      const lamports = amount * LAMPORTS_PER_SOL;
-      
-      // For Phantom wallet
-      if (connected && publicKey) {
-        console.log("Using Phantom wallet for funding");
-        addGameMessage(`Processing ${amount} SOL with Phantom wallet...`);
-        
-        // Simulate funding for Phantom wallet
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Simulated success
-        const newEscrowFunded = { ...escrowFunded };
-        newEscrowFunded[publicKey.toString()] = true;
-        setEscrowFunded(newEscrowFunded);
-        
-        addGameMessage(`✅ Escrow funded with ${amount} SOL! (Phantom simulation)`);
-        return true;
-      }
-      // For Crossmint wallet
-      else if (crossmintConnected && crossmintAddress && sendToEscrow) {
-        console.log("Using Crossmint wallet for funding");
-        addGameMessage(`Processing ${amount} SOL with Crossmint wallet...`);
-        
-        // Use Crossmint's sendToEscrow
-        const result = await sendToEscrow(gameId, address, amount);
-        
-        if (!result) {
-          throw new Error("Transaction failed - no result returned");
-        }
-        
-        // Update escrow funded status
-        const newEscrowFunded = { ...escrowFunded };
-        newEscrowFunded[crossmintAddress] = true;
-        setEscrowFunded(newEscrowFunded);
-        
-        const txInfo = result.signature ? 
-          `Transaction: ${result.signature.slice(0, 8)}...` : 
-          'Transaction completed';
-        
-        addGameMessage(`✅ Escrow funded with ${amount} SOL! ${txInfo}`);
-        return true;
-      } else {
-        addGameMessage("⚠️ No wallet connected. Please connect a wallet to play.");
+      if (!connected || !publicKey) {
+        addGameMessage("⚠️ No wallet connected. Please connect your wallet to play.");
         return false;
       }
+      
+      // Convert SOL to lamports
+      const lamports = amount * LAMPORTS_PER_SOL;
+      addGameMessage(`Processing ${amount} SOL transaction to escrow...`);
+      
+      // Use the real sendToEscrow function from our service
+      const result = await sendToEscrow(gameId, address, amount);
+      
+      if (!result || !result.success) {
+        throw new Error("Transaction failed");
+      }
+      
+      console.log("Transaction successful:", result);
+      
+      // Update escrow funded status in the UI
+      const newEscrowFunded = { ...escrowFunded };
+      newEscrowFunded[publicKey.toString()] = true;
+      setEscrowFunded(newEscrowFunded);
+      
+      // Get updated balance
+      try {
+        const balance = await getEscrowBalance(address);
+        setEscrowBalance(balance);
+      } catch (error) {
+        console.error("Error updating escrow balance:", error);
+      }
+      
+      const txInfo = result.signature ? 
+        `Transaction: ${result.signature.slice(0, 8)}...` : 
+        'Transaction completed';
+      
+      addGameMessage(`✅ Escrow funded with ${amount} SOL! ${txInfo}`);
+      return true;
     } catch (error) {
       console.error("Error funding escrow:", error);
       addGameMessage(`⚠️ Transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1352,39 +1328,45 @@ const MinesweeperGame: React.FC = () => {
         throw new Error("Missing game ID or escrow address");
       }
       
-      // For Phantom wallet
-      if (connected && publicKey) {
-        console.log("Using Phantom wallet for claiming rewards");
-        
-        // Simulate claiming rewards
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        setEscrowClaimed(true);
-        addGameMessage(`🎉 You've claimed your winnings! (Phantom simulation)`);
-        return true;
+      if (!connected || !publicKey) {
+        throw new Error("Wallet not connected");
       }
-      // For Crossmint wallet
-      else if (crossmintConnected && crossmintAddress && releaseEscrow) {
-        console.log("Using Crossmint wallet for claiming rewards");
-        
-        // Use Crossmint's releaseEscrow
-        const result = await releaseEscrow(gameId, escrowAddress, crossmintAddress);
-        
-        if (!result) {
-          throw new Error("Claim transaction failed - no result returned");
-        }
-        
-        setEscrowClaimed(true);
-        
-        const txInfo = result.signature ? 
-          `Transaction: ${result.signature.slice(0, 8)}...` : 
-          'Transaction completed';
-        
-        addGameMessage(`🎉 You've claimed your winnings! ${txInfo}`);
-        return true;
-      } else {
-        throw new Error("No wallet connected");
+      
+      // Verify game is in WIN state
+      if (gameState !== GameStateEnum.WIN) {
+        throw new Error("You can only claim rewards when you've won the game");
       }
+      
+      if (escrowClaimed) {
+        throw new Error("Rewards have already been claimed");
+      }
+      
+      // First, set the winner on the contract
+      try {
+        await setWinner(gameId, escrowAddress, publicKey.toString());
+        addGameMessage("Winner verified on the blockchain...");
+      } catch (error) {
+        console.error("Error setting winner:", error);
+        addGameMessage("⚠️ Error verifying winner: " + (error instanceof Error ? error.message : "Unknown error"));
+        throw error;
+      }
+      
+      // Then release the escrow to the winner
+      const result = await releaseEscrow(gameId, escrowAddress, publicKey.toString());
+      
+      if (!result || !result.success) {
+        throw new Error("Claim transaction failed");
+      }
+      
+      console.log("Claim successful:", result);
+      setEscrowClaimed(true);
+      
+      const txInfo = result.signature ? 
+        `Transaction: ${result.signature.slice(0, 8)}...` : 
+        'Transaction completed';
+      
+      addGameMessage(`🎉 You've claimed your winnings! ${txInfo}`);
+      return true;
     } catch (error) {
       console.error("Error claiming rewards:", error);
       addGameMessage(`⚠️ Claim failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
