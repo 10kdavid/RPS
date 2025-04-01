@@ -937,6 +937,14 @@ const MinesweeperGame: React.FC = () => {
   // Add a ref to track the unsubscribe function
   const unsubscribeRef = React.useRef<(() => void) | null>(null);
 
+  // Find the sidebarCollapsed state and add toggleSidebar function
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+
+  // Add toggleSidebar function
+  const toggleSidebar = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  };
+
   // Methods
   const handleCellClick = (row: number, col: number) => {
     // Only allow clicks if it's the player's turn and game is in PLAYING state
@@ -1630,9 +1638,9 @@ const MinesweeperGame: React.FC = () => {
         <meta name="description" content="Play Minesweeper on Solana blockchain and win SOL tokens. Strategic multiplayer mining game with secure betting." />
       </Head>
       <AppSidebar 
-        collapsed={false}
+        collapsed={sidebarCollapsed}
         currentPage="mines"
-        toggleSidebar={() => {}}
+        toggleSidebar={toggleSidebar}
       />
       <GameWrapper>
         <GameContainer>

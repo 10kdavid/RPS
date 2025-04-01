@@ -696,7 +696,7 @@ const BlackjackGame: React.FC = () => {
   const [opponentScore, setOpponentScore] = useState(0);
   const [betAmount, setBetAmount] = useState(0.05);
   const [result, setResult] = useState<GameResult>(GameResult.NOT_DETERMINED);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState('rules');
   const [currentTurn, setCurrentTurn] = useState<PlayerTurn>(PlayerTurn.PLAYER);
   const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.DISCONNECTED);

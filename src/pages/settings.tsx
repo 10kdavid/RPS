@@ -295,6 +295,14 @@ const Settings = () => {
   const [animations, setAnimations] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
   
+  // Add a state for sidebar collapsed
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  
+  // Add a toggleSidebar function
+  const toggleSidebar = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  };
+  
   // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -311,11 +319,12 @@ const Settings = () => {
       
       <PageContainer>
         <AppSidebar 
-          collapsed={false}
+          collapsed={sidebarCollapsed}
           currentPage="settings"
+          toggleSidebar={toggleSidebar}
         />
         
-        <MainContent collapsed={false}>
+        <MainContent collapsed={sidebarCollapsed}>
           <SettingsContainer>
             <SettingsTitle>Settings</SettingsTitle>
             
