@@ -1,6 +1,8 @@
 import React from 'react';
 import styled from 'styled-components';
 import Link from 'next/link';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import WalletBalance from './WalletBalance';
 
 interface SidebarContainerProps {
   collapsed: boolean;
@@ -274,6 +276,16 @@ const SidebarLink = styled.a<SidebarLinkProps>`
   }
 `;
 
+// Add this after the SidebarLink styled component
+const WalletContainer = styled.div`
+  margin-top: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+`;
+
 interface SidebarProps {
   collapsed: boolean;
   currentPage: string;
@@ -351,6 +363,11 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, currentPage, toggleSidebar
           </SidebarLink>
         </Link>
       </SidebarSection>
+      
+      <WalletContainer>
+        <WalletMultiButton />
+        <WalletBalance />
+      </WalletContainer>
     </SidebarContainer>
   );
 };
