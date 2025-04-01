@@ -5,6 +5,7 @@ import Layout from '../components/Layout';
 import WalletProvider from '../contexts/WalletContext';
 import CrossmintWalletProvider from '../contexts/CrossmintWalletContext';
 import '../styles/globals.css';
+import WalletContextProvider from '../components/WalletContext';
 
 // Define theme for styled-components
 const theme = {
@@ -53,15 +54,17 @@ function MyApp({ Component, pageProps }: AppProps) {
   return (
     <>
       <GlobalStyle />
-      <ThemeProvider theme={theme}>
-        <CrossmintWalletProvider>
-          <WalletProvider>
-            <Layout>
-              <Component {...pageProps} />
-            </Layout>
-          </WalletProvider>
-        </CrossmintWalletProvider>
-      </ThemeProvider>
+      <WalletContextProvider>
+        <ThemeProvider theme={theme}>
+          <CrossmintWalletProvider>
+            <WalletProvider>
+              <Layout>
+                <Component {...pageProps} />
+              </Layout>
+            </WalletProvider>
+          </CrossmintWalletProvider>
+        </ThemeProvider>
+      </WalletContextProvider>
     </>
   );
 }

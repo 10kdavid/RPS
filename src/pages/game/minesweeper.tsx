@@ -1402,7 +1402,7 @@ const MinesweeperGame: React.FC = () => {
       
       // Convert SOL to lamports
       const lamports = amount * LAMPORTS_PER_SOL;
-      addGameMessage(`Processing ${amount} SOL transaction to escrow on Solana devnet...`);
+      addGameMessage(`Processing ${amount} devnet SOL transaction to escrow...`);
       
       // Use the real sendToEscrow function from our service
       const result = await sendToEscrow(gameId, address, amount);
@@ -1440,7 +1440,7 @@ const MinesweeperGame: React.FC = () => {
         `Transaction: ${result.signature.slice(0, 8)}...` : 
         'Transaction completed';
       
-      addGameMessage(`✅ Escrow funded with ${amount} SOL! ${txInfo}`);
+      addGameMessage(`✅ Escrow funded with ${amount} devnet SOL! ${txInfo}`);
       return true;
     } catch (error) {
       console.error("Error funding escrow:", error);
@@ -1523,7 +1523,7 @@ const MinesweeperGame: React.FC = () => {
         `Transaction: ${result.signature.slice(0, 8)}...` : 
         'Transaction completed';
       
-      addGameMessage(`🎉 You've claimed ${balance} SOL in winnings! ${txInfo}`);
+      addGameMessage(`🎉 You've claimed ${balance} devnet SOL in winnings! ${txInfo}`);
       return true;
     } catch (error) {
       console.error("Error claiming rewards:", error);
@@ -1640,10 +1640,10 @@ const MinesweeperGame: React.FC = () => {
             {gameState === GameStateEnum.INIT && (
               <>
                 <h2>Minesweeper</h2>
-                <p>Find all the gems without hitting any mines! Each game has 5 mines hidden on the board.</p>
+                <p>Find all the gems without hitting any mines! Each game has 5 mines hidden on the board. Place bets with Solana devnet SOL.</p>
                 
                 <AmountContainer>
-            <InputLabel>Bet Amount (SOL)</InputLabel>
+            <InputLabel>Bet Amount (devnet SOL)</InputLabel>
             <InputContainer>
                     <CurrencyIcon>◎</CurrencyIcon>
               <AmountInput 

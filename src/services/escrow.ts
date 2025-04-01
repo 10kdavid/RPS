@@ -19,7 +19,7 @@ async function getWorkingConnection(commitment: 'confirmed' | 'finalized' = 'con
       const connection = new Connection(endpoint, commitment);
       // Verify the connection works
       await connection.getVersion();
-      console.log(`Connected to ${endpoint}`);
+      console.log(`Connected to Solana devnet at ${endpoint}`);
       return connection;
     } catch (error) {
       console.warn(`Failed to connect to ${endpoint}:`, error);
@@ -188,7 +188,7 @@ export class EscrowService {
       // Get the escrow PDA
       const [escrowAddress, bump] = await this.getEscrowAddress(gameId, this.wallet.publicKey);
       
-      console.log("Creating escrow at address:", escrowAddress.toString());
+      console.log("Creating escrow wallet on Solana devnet at address:", escrowAddress.toString());
       
       // Call the initialize_escrow instruction
       const tx = await program.methods
