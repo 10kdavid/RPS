@@ -1,34 +1,28 @@
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, set, onValue, off, get, connectDatabaseEmulator } from 'firebase/database';
+import { getDatabase, ref, set, onValue, off, get } from 'firebase/database';
 
 console.log("Initializing Firebase...");
 
-// Use environment variables for Firebase config
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCb0BrVOWh5hV7NJ0dTwijFvNsCCBhYCyk",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "rock-paper-solana.firebaseapp.com",
-  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || "https://rock-paper-solana-default-rtdb.firebaseio.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "rock-paper-solana",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "rock-paper-solana.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "1003950152721",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:1003950152721:web:a44ac548ab1b662b0be5b0"
-};
-
-console.log("Firebase config:", { 
-  apiKey: firebaseConfig.apiKey ? "Set" : "Not set",
-  dbUrl: firebaseConfig.databaseURL ? "Set" : "Not set"
-});
-
-let app;
+// Initialize Firebase only if needed
 let database;
-
 try {
-  // Initialize Firebase
-  app = initializeApp(firebaseConfig);
-  database = getDatabase(app);
-  console.log("Firebase initialized successfully");
+  // Get existing database instance
+  database = getDatabase();
+  console.log("Using existing Firebase instance");
 } catch (error) {
-  console.error("Error initializing Firebase:", error);
+  // Only initialize if no instance exists
+  const firebaseConfig = {
+    apiKey: "AIzaSyCb0BrVOWh5hV7NJ0dTwijFvNsCCBhYCyk",
+    authDomain: "rock-paper-solana.firebaseapp.com",
+    databaseURL: "https://rock-paper-solana-default-rtdb.firebaseio.com",
+    projectId: "rock-paper-solana",
+    storageBucket: "rock-paper-solana.firebasestorage.app",
+    messagingSenderId: "1003950152721",
+    appId: "1:1003950152721:web:a44ac548ab1b662b0be5b0"
+  };
+  const app = initializeApp(firebaseConfig);
+  database = getDatabase(app);
+  console.log("Created new Firebase instance");
 }
 
 // Game multiplayer functions

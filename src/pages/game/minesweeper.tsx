@@ -15,35 +15,20 @@ import {
   checkGameExists
 } from '../../utils/firebase';
 import { useEscrowService } from '../../services/escrow';
-import { ref, set, get, getDatabase } from 'firebase/database';
-import { initializeApp } from 'firebase/app';
+import { getDatabase, ref, set, get } from 'firebase/database';
+import firebase from 'firebase/app';
+import 'firebase/database';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
-// Get Firebase database reference - using a reliable approach
+// Use a single Firebase instance for everything
 let database;
 try {
-  // Try to get the database from the already initialized app in utils/firebase.ts
+  // Initialize a standard Firebase connection
   database = getDatabase();
-  console.log("Using main Firebase instance from utils/firebase.ts");
+  console.log("Successfully connected to Firebase database");
 } catch (error) {
-  console.error("Error getting Firebase database:", error);
-  // Only initialize a new instance if getting the existing one fails
-  try {
-    const firebaseConfig = {
-      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCb0BrVOWh5hV7NJ0dTwijFvNsCCBhYCyk",
-      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "rock-paper-solana.firebaseapp.com",
-      databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || "https://rock-paper-solana-default-rtdb.firebaseio.com",
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "rock-paper-solana",
-      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "rock-paper-solana.firebasestorage.app",
-      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "1003950152721",
-      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:1003950152721:web:a44ac548ab1b662b0be5b0"
-    };
-    const app = initializeApp(firebaseConfig, "minesweeperInstance");
-    database = getDatabase(app);
-    console.log("Created new Firebase instance for minesweeper");
-  } catch (fallbackError) {
-    console.error("Could not initialize Firebase:", fallbackError);
-  }
+  console.error("Firebase database error:", error);
+  alert("Error connecting to Firebase. Check console for details.");
 }
 
 // Game States & Types
@@ -1137,130 +1122,105 @@ const MinesweeperGame: React.FC = () => {
   };
 
   const handleCreateGame = async () => {
+    console.log("Create game button clicked");
+    
+    // Test direct Firebase write
     try {
-      console.log("Create game button clicked");
-      alert("Create Game button clicked - check console for details");
-      setGameMessages([]);
+      const testRef = ref(database, "test/connection");
+      await set(testRef, {
+        connected: true,
+        wallet: publicKey.toString(),
+        timestamp: Date.now()
+      });
+      console.log("Direct Firebase test successful");
+    } catch (fbError) {
+      console.error("Firebase direct write failed:", fbError);
+      alert("Firebase connection error. Check console for details.");
+      return;
+    }
+    
+    if (!connected || !publicKey) {
+      console.log("No wallet connected");
+      alert("Please connect your wallet first");
+      return;
+    }
+    
+    const playerId = publicKey.toString();
+    console.log("Creating game for player:", playerId);
+    
+    try {
+      // Create game session directly without all the complex error handling
+      const newGameId = await createGameSession('minesweeper', playerId);
+      console.log("Game created with ID:", newGameId);
       
-      if (!connected || !publicKey) {
-        console.log("No wallet connected");
-        addGameMessage("⚠️ Please connect your wallet to create a game.");
-        return;
+      // Continue with the rest of your function...
+      setGameId(newGameId);
+      setGameLink(generateGameLink(newGameId));
+      
+      // Initialize grid, etc.
+      setGameState(GameStateEnum.WAITING);
+      setActiveScreen('game');
+      setGrid(initializeGrid());
+      
+      // Start listening for real opponent and game updates
+      console.log("Setting up listener for game updates");
+      addGameMessage("🔄 Setting up real-time connection...");
+      
+      const unsubscribe = listenToGameUpdates('minesweeper', newGameId, (data) => {
+        console.log("Game update received:", data);
+        
+        // Update opponent info if someone joined
+        if (data.opponent && !hasOpponent) {
+          setHasOpponent(true);
+          setOpponentAddress(data.opponent);
+          setGameState(GameStateEnum.PLAYING);
+          addGameMessage(`Opponent ${data.opponent.substring(0, 6)}... joined the game!`);
+          
+          // Update game status in Firebase to playing
+          updateGameState('minesweeper', newGameId, {
+            status: 'playing'
+          }).catch(error => {
+            console.error("Error updating game status:", error);
+          });
+        }
+        
+        // Rest of the game update handling...
+        // ... existing code ...
+      });
+      
+      // Store the unsubscribe function
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+      unsubscribeRef.current = unsubscribe;
+      
+      console.log("Game creation complete");
+      addGameMessage("✅ Game created! Waiting for opponent. Copy and share the link to invite someone.");
+      
+      // Add a game link display
+      setTimeout(() => {
+        addGameMessage(`📋 Game link: ${generateGameLink(newGameId)}`);
+        addGameMessage("Click 'Copy Link' to share with a friend.");
+      }, 500);
+      
+    } catch (error) {
+      console.error("Error creating game:", error);
+      if (error instanceof Error) {
+        addGameMessage(`⚠️ Error creating game: ${error.message}`);
+        console.error("Error stack:", error.stack);
+        
+        // Special handling for common errors
+        if (error.message.includes("Firebase")) {
+          addGameMessage("⚠️ Firebase connection issue. Please check your internet connection.");
+        } else if (error.message.includes("database")) {
+          addGameMessage("⚠️ Database access error. Try refreshing the page.");
+        }
+      } else {
+        addGameMessage(`⚠️ Error creating game: Unknown error`);
       }
       
-      console.log("Connected wallet:", publicKey.toString());
-      addGameMessage("🔄 Creating game... Please wait.");
-      
-      try {
-        // Test if we can access Firebase directly
-        try {
-          const testRef = ref(database, `test_connection_${Date.now()}`);
-          await set(testRef, { timestamp: Date.now() });
-          console.log("Direct Firebase write successful");
-        } catch (directError) {
-          console.error("Direct Firebase access error:", directError);
-          addGameMessage("⚠️ Firebase connection issue. Check console for details.");
-        }
-        
-        // Create a new game session in Firebase with real player ID
-        const playerId = publicKey.toString();
-        console.log("About to call createGameSession with:", 'minesweeper', playerId);
-        addGameMessage("🔄 Creating game session...");
-        
-        const newGameId = await createGameSession('minesweeper', playerId);
-        console.log("Game session created with ID:", newGameId);
-        addGameMessage(`✅ Game session created! ID: ${newGameId}`);
-        
-        setGameId(newGameId);
-        setGameLink(generateGameLink(newGameId));
-        
-        // Initialize the grid
-        console.log("Initializing grid");
-        const newGrid = initializeGrid();
-        setGrid(newGrid);
-        
-        // Store the grid and bet amount in Firebase
-        console.log("Updating game state with grid and bet amount");
-        addGameMessage("🔄 Saving game data...");
-        
-        await updateGameState('minesweeper', newGameId, {
-          gameData: {
-            grid: newGrid,
-            betAmount: betAmount
-          }
-        });
-        
-        addGameMessage("✅ Game data saved!");
-        
-        // Set game state
-        console.log("Setting game state to WAITING");
-        setHasOpponent(false);
-        setGameState(GameStateEnum.WAITING);
-        setActiveScreen('game');
-        
-        // Start listening for real opponent and game updates
-        console.log("Setting up listener for game updates");
-        addGameMessage("🔄 Setting up real-time connection...");
-        
-        const unsubscribe = listenToGameUpdates('minesweeper', newGameId, (data) => {
-          console.log("Game update received:", data);
-          
-          // Update opponent info if someone joined
-          if (data.opponent && !hasOpponent) {
-            setHasOpponent(true);
-            setOpponentAddress(data.opponent);
-            setGameState(GameStateEnum.PLAYING);
-            addGameMessage(`Opponent ${data.opponent.substring(0, 6)}... joined the game!`);
-            
-            // Update game status in Firebase to playing
-            updateGameState('minesweeper', newGameId, {
-              status: 'playing'
-            }).catch(error => {
-              console.error("Error updating game status:", error);
-            });
-          }
-          
-          // Rest of the game update handling...
-          // ... existing code ...
-        });
-        
-        // Store the unsubscribe function
-        if (unsubscribeRef.current) {
-          unsubscribeRef.current();
-        }
-        unsubscribeRef.current = unsubscribe;
-        
-        console.log("Game creation complete");
-        addGameMessage("✅ Game created! Waiting for opponent. Copy and share the link to invite someone.");
-        
-        // Add a game link display
-        setTimeout(() => {
-          addGameMessage(`📋 Game link: ${generateGameLink(newGameId)}`);
-          addGameMessage("Click 'Copy Link' to share with a friend.");
-        }, 500);
-        
-      } catch (error) {
-        console.error("Error creating game:", error);
-        if (error instanceof Error) {
-          addGameMessage(`⚠️ Error creating game: ${error.message}`);
-          console.error("Error stack:", error.stack);
-          
-          // Special handling for common errors
-          if (error.message.includes("Firebase")) {
-            addGameMessage("⚠️ Firebase connection issue. Please check your internet connection.");
-          } else if (error.message.includes("database")) {
-            addGameMessage("⚠️ Database access error. Try refreshing the page.");
-          }
-        } else {
-          addGameMessage(`⚠️ Error creating game: Unknown error`);
-        }
-        
-        // Suggest using the debug button
-        addGameMessage("Try using the Debug button below to diagnose the issue.");
-      }
-    } catch (outerError) {
-      console.error("Outer error in handleCreateGame:", outerError);
-      addGameMessage(`⚠️ Fatal error: ${outerError instanceof Error ? outerError.message : 'Unknown error'}`);
+      // Suggest using the debug button
+      addGameMessage("Try using the Debug button below to diagnose the issue.");
     }
   };
 
