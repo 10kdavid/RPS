@@ -1,82 +1,102 @@
 {
   "..\\node_modules\\@particle-network\\auth\\es\\index.js -> draggabilly": {
-    "id": null,
-    "files": []
+    "id": "..\\node_modules\\@particle-network\\auth\\es\\index.js -> draggabilly",
+    "files": [
+      "static/chunks/node_modules_draggabilly_draggabilly_js.js"
+    ]
   },
   "..\\node_modules\\@solana\\wallet-adapter-fractal\\lib\\esm\\adapter.js -> @fractalwagmi/solana-wallet-adapter": {
-    "id": null,
-    "files": []
+    "id": "..\\node_modules\\@solana\\wallet-adapter-fractal\\lib\\esm\\adapter.js -> @fractalwagmi/solana-wallet-adapter",
+    "files": [
+      "static/chunks/node_modules_fractalwagmi_solana-wallet-adapter_dist_esm_index_js.js"
+    ]
   },
   "..\\node_modules\\@solana\\wallet-adapter-keystone\\lib\\esm\\adapter.js -> @keystonehq/sol-keyring": {
-    "id": null,
-    "files": []
+    "id": "..\\node_modules\\@solana\\wallet-adapter-keystone\\lib\\esm\\adapter.js -> @keystonehq/sol-keyring",
+    "files": [
+      "static/chunks/node_modules_keystonehq_sol-keyring_dist_index_js.js"
+    ]
   },
   "..\\node_modules\\@solana\\wallet-adapter-ledger\\lib\\esm\\adapter.js -> @ledgerhq/hw-transport-webhid": {
-    "id": null,
-    "files": []
+    "id": "..\\node_modules\\@solana\\wallet-adapter-ledger\\lib\\esm\\adapter.js -> @ledgerhq/hw-transport-webhid",
+    "files": [
+      "static/chunks/node_modules_ledgerhq_hw-transport-webhid_lib-es_TransportWebHID_js.js"
+    ]
   },
   "..\\node_modules\\@solana\\wallet-adapter-particle\\lib\\esm\\adapter.js -> @particle-network/solana-wallet": {
-    "id": null,
-    "files": []
+    "id": "..\\node_modules\\@solana\\wallet-adapter-particle\\lib\\esm\\adapter.js -> @particle-network/solana-wallet",
+    "files": [
+      "static/chunks/node_modules_solana_wallet-adapter-particle_node_modules_particle-network_solana-wallet_es_index_js.js"
+    ]
   },
   "..\\node_modules\\@solana\\wallet-adapter-salmon\\lib\\esm\\adapter.js -> salmon-adapter-sdk": {
-    "id": null,
-    "files": []
+    "id": "..\\node_modules\\@solana\\wallet-adapter-salmon\\lib\\esm\\adapter.js -> salmon-adapter-sdk",
+    "files": [
+      "static/chunks/node_modules_salmon-adapter-sdk_lib_esm_index_js.js"
+    ]
   },
   "..\\node_modules\\@solana\\wallet-adapter-solflare\\lib\\esm\\adapter.js -> @solflare-wallet/sdk": {
-    "id": 119,
+    "id": "..\\node_modules\\@solana\\wallet-adapter-solflare\\lib\\esm\\adapter.js -> @solflare-wallet/sdk",
     "files": [
-      "static/chunks/119.a3d5a3d56be64da3.js"
+      "static/chunks/node_modules_solflare-wallet_sdk_lib_esm_index_js.js"
     ]
   },
   "..\\node_modules\\@solana\\wallet-adapter-solflare\\lib\\esm\\metamask\\wallet.js -> @solflare-wallet/metamask-sdk": {
-    "id": 9525,
+    "id": "..\\node_modules\\@solana\\wallet-adapter-solflare\\lib\\esm\\metamask\\wallet.js -> @solflare-wallet/metamask-sdk",
     "files": [
-      "static/chunks/525.dc7e1bd1d4ddad71.js"
+      "static/chunks/node_modules_solflare-wallet_metamask-sdk_lib_esm_index_js.js"
     ]
   },
   "..\\node_modules\\@solana\\wallet-adapter-torus\\lib\\esm\\adapter.js -> @toruslabs/solana-embed": {
-    "id": null,
-    "files": []
+    "id": "..\\node_modules\\@solana\\wallet-adapter-torus\\lib\\esm\\adapter.js -> @toruslabs/solana-embed",
+    "files": [
+      "static/chunks/node_modules_toruslabs_solana-embed_dist_solanaEmbed_esm_js.js"
+    ]
   },
   "..\\node_modules\\@solana\\wallet-adapter-trezor\\lib\\esm\\adapter.js -> @trezor/connect-web": {
-    "id": null,
-    "files": []
+    "id": "..\\node_modules\\@solana\\wallet-adapter-trezor\\lib\\esm\\adapter.js -> @trezor/connect-web",
+    "files": [
+      "static/chunks/node_modules_trezor_connect-web_lib_index_js.js"
+    ]
   },
   "..\\node_modules\\@solana\\wallet-adapter-walletconnect\\lib\\esm\\adapter.js -> @jnwng/walletconnect-solana": {
-    "id": null,
-    "files": []
+    "id": "..\\node_modules\\@solana\\wallet-adapter-walletconnect\\lib\\esm\\adapter.js -> @jnwng/walletconnect-solana",
+    "files": [
+      "static/chunks/node_modules_jnwng_walletconnect-solana_lib_esm_index_js.js"
+    ]
   },
   "..\\node_modules\\next\\dist\\client\\index.js -> ../pages/_app": {
-    "id": 490,
+    "id": "..\\node_modules\\next\\dist\\client\\index.js -> ../pages/_app",
     "files": [
-      "static/chunks/490.522c06a4229dbae9.js"
+      "static/chunks/node_modules_next_dist_pages__app_js.js"
     ]
   },
   "..\\node_modules\\next\\dist\\client\\index.js -> ../pages/_error": {
-    "id": 8537,
+    "id": "..\\node_modules\\next\\dist\\client\\index.js -> ../pages/_error",
     "files": [
-      "static/chunks/537.69868ce97d75d3e1.js"
+      "static/chunks/node_modules_next_dist_pages__error_js.js"
     ]
   },
   "..\\node_modules\\viem\\_esm\\actions\\public\\call.js -> ../../utils/ccip.js": {
-    "id": null,
+    "id": "..\\node_modules\\viem\\_esm\\actions\\public\\call.js -> ../../utils/ccip.js",
     "files": []
   },
   "..\\node_modules\\viem\\_esm\\utils\\rpc\\webSocket.js -> isows": {
-    "id": null,
-    "files": []
+    "id": "..\\node_modules\\viem\\_esm\\utils\\rpc\\webSocket.js -> isows",
+    "files": [
+      "static/chunks/node_modules_isows__esm_native_js.js"
+    ]
   },
   "..\\node_modules\\viem\\_esm\\utils\\signature\\recoverPublicKey.js -> @noble/curves/secp256k1": {
-    "id": null,
+    "id": "..\\node_modules\\viem\\_esm\\utils\\signature\\recoverPublicKey.js -> @noble/curves/secp256k1",
     "files": []
   },
   "pages\\game\\minesweeper.tsx -> firebase/app": {
-    "id": 3977,
+    "id": "pages\\game\\minesweeper.tsx -> firebase/app",
     "files": []
   },
   "pages\\game\\minesweeper.tsx -> firebase/database": {
-    "id": 1019,
+    "id": "pages\\game\\minesweeper.tsx -> firebase/database",
     "files": []
   }
 }

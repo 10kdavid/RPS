@@ -1,102 +1,41 @@
 {
   "polyfillFiles": [
-    "static/chunks/polyfills-42372ed130431b0a.js"
+    "static/chunks/polyfills.js"
   ],
-  "devFiles": [],
+  "devFiles": [
+    "static/chunks/react-refresh.js"
+  ],
   "ampDevFiles": [],
   "lowPriorityFiles": [
-    "static/2IH-vVTpQiovqT7Rb1wF5/_buildManifest.js",
-    "static/2IH-vVTpQiovqT7Rb1wF5/_ssgManifest.js"
+    "static/development/_buildManifest.js",
+    "static/development/_ssgManifest.js"
   ],
   "rootMainFiles": [],
   "pages": {
     "/": [
-      "static/chunks/webpack-f9ca5c3fae194c69.js",
-      "static/chunks/framework-64ad27b21261a9ce.js",
-      "static/chunks/main-ab468911775b650a.js",
-      "static/chunks/pages/index-aba7771ab0515feb.js"
-    ],
-    "/404": [
-      "static/chunks/webpack-f9ca5c3fae194c69.js",
-      "static/chunks/framework-64ad27b21261a9ce.js",
-      "static/chunks/main-ab468911775b650a.js",
-      "static/chunks/pages/404-00f2fda2f22d494d.js"
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/index.js"
     ],
     "/_app": [
-      "static/chunks/webpack-f9ca5c3fae194c69.js",
-      "static/chunks/framework-64ad27b21261a9ce.js",
-      "static/chunks/main-ab468911775b650a.js",
-      "static/css/eb519bd8ddc98b56.css",
-      "static/chunks/pages/_app-f58720956932c8b9.js"
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/_app.js"
     ],
     "/_error": [
-      "static/chunks/webpack-f9ca5c3fae194c69.js",
-      "static/chunks/framework-64ad27b21261a9ce.js",
-      "static/chunks/main-ab468911775b650a.js",
-      "static/chunks/pages/_error-040e4977a8a65860.js"
-    ],
-    "/about": [
-      "static/chunks/webpack-f9ca5c3fae194c69.js",
-      "static/chunks/framework-64ad27b21261a9ce.js",
-      "static/chunks/main-ab468911775b650a.js",
-      "static/chunks/pages/about-939b409face59069.js"
-    ],
-    "/contact": [
-      "static/chunks/webpack-f9ca5c3fae194c69.js",
-      "static/chunks/framework-64ad27b21261a9ce.js",
-      "static/chunks/main-ab468911775b650a.js",
-      "static/chunks/pages/contact-52fea3f0f2e3c66d.js"
-    ],
-    "/game/blackjack": [
-      "static/chunks/webpack-f9ca5c3fae194c69.js",
-      "static/chunks/framework-64ad27b21261a9ce.js",
-      "static/chunks/main-ab468911775b650a.js",
-      "static/chunks/a198fdd9-37eb999562f00c43.js",
-      "static/chunks/414-9117e86f88b57d49.js",
-      "static/chunks/257-cbf05ede486cbb27.js",
-      "static/chunks/pages/game/blackjack-ce2847b6fba2d131.js"
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/_error.js"
     ],
     "/game/minesweeper": [
-      "static/chunks/webpack-f9ca5c3fae194c69.js",
-      "static/chunks/framework-64ad27b21261a9ce.js",
-      "static/chunks/main-ab468911775b650a.js",
-      "static/chunks/a198fdd9-37eb999562f00c43.js",
-      "static/chunks/11e07bb4-b7390042e02c4202.js",
-      "static/chunks/b8b506e4-29cbc4b1131d9606.js",
-      "static/chunks/414-9117e86f88b57d49.js",
-      "static/chunks/216-65958b370f8c1421.js",
-      "static/chunks/257-cbf05ede486cbb27.js",
-      "static/chunks/pages/game/minesweeper-49b5454873d48d67.js"
-    ],
-    "/game/rock-paper-scissors": [
-      "static/chunks/webpack-f9ca5c3fae194c69.js",
-      "static/chunks/framework-64ad27b21261a9ce.js",
-      "static/chunks/main-ab468911775b650a.js",
-      "static/chunks/pages/game/rock-paper-scissors-4911ded836e55334.js"
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/game/minesweeper.js"
     ],
     "/games": [
-      "static/chunks/webpack-f9ca5c3fae194c69.js",
-      "static/chunks/framework-64ad27b21261a9ce.js",
-      "static/chunks/main-ab468911775b650a.js",
-      "static/chunks/pages/games-1e014ac9222cc27c.js"
-    ],
-    "/help": [
-      "static/chunks/webpack-f9ca5c3fae194c69.js",
-      "static/chunks/framework-64ad27b21261a9ce.js",
-      "static/chunks/main-ab468911775b650a.js",
-      "static/chunks/pages/help-046c58df39c63603.js"
-    ],
-    "/settings": [
-      "static/chunks/webpack-f9ca5c3fae194c69.js",
-      "static/chunks/framework-64ad27b21261a9ce.js",
-      "static/chunks/main-ab468911775b650a.js",
-      "static/chunks/pages/settings-4f3ff5782dcae9a2.js"
-    ],
-    "/wallet": [
-      "static/chunks/webpack-f9ca5c3fae194c69.js",
-      "static/chunks/framework-64ad27b21261a9ce.js",
-      "static/chunks/main-ab468911775b650a.js",
-      "static/chunks/pages/wallet-aaad0ce8d6738070.js"
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/games.js"
     ]
   },
   "ampFirstPages": []

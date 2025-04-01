@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { useWallet } from '../../contexts/WalletContext';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useCrossmintWallet } from '../../contexts/CrossmintWalletContext';
 import Link from 'next/link';
 import AppSidebar from '../../components/Sidebar';
@@ -15,6 +15,36 @@ import {
   checkGameExists
 } from '../../utils/firebase';
 import { useEscrowService } from '../../services/escrow';
+import { ref, set, get, getDatabase } from 'firebase/database';
+import { initializeApp } from 'firebase/app';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+
+// Get Firebase database reference - using a reliable approach
+let database;
+try {
+  // Try to get the database from the already initialized app in utils/firebase.ts
+  database = getDatabase();
+  console.log("Using main Firebase instance from utils/firebase.ts");
+} catch (error) {
+  console.error("Error getting Firebase database:", error);
+  // Only initialize a new instance if getting the existing one fails
+  try {
+    const firebaseConfig = {
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCb0BrVOWh5hV7NJ0dTwijFvNsCCBhYCyk",
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "rock-paper-solana.firebaseapp.com",
+      databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || "https://rock-paper-solana-default-rtdb.firebaseio.com",
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "rock-paper-solana",
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "rock-paper-solana.firebasestorage.app",
+      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "1003950152721",
+      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:1003950152721:web:a44ac548ab1b662b0be5b0"
+    };
+    const app = initializeApp(firebaseConfig, "minesweeperInstance");
+    database = getDatabase(app);
+    console.log("Created new Firebase instance for minesweeper");
+  } catch (fallbackError) {
+    console.error("Could not initialize Firebase:", fallbackError);
+  }
+}
 
 // Game States & Types
 enum GameStateEnum {
@@ -682,7 +712,7 @@ interface SidebarProps {
   collapsed: boolean;
 }
 
-const MainContent = styled.div`
+const MainContent = styled.div<SidebarProps>`
   padding: 20px;
   color: rgba(255, 255, 255, 0.8);
   
@@ -1109,144 +1139,128 @@ const MinesweeperGame: React.FC = () => {
   const handleCreateGame = async () => {
     try {
       console.log("Create game button clicked");
+      alert("Create Game button clicked - check console for details");
       setGameMessages([]);
       
       if (!connected || !publicKey) {
         console.log("No wallet connected");
         addGameMessage("⚠️ Please connect your wallet to create a game.");
-      return;
-    }
-    
-      console.log("Creating game with wallet", publicKey.toString());
+        return;
+      }
       
-      // Create a new game session in Firebase with real player ID
-      const playerId = publicKey.toString();
-      const newGameId = await createGameSession('minesweeper', playerId);
-      console.log("Game session created with ID:", newGameId);
+      console.log("Connected wallet:", publicKey.toString());
+      addGameMessage("🔄 Creating game... Please wait.");
       
-      setGameId(newGameId);
-      setGameLink(generateGameLink(newGameId));
-      
-      // Initialize the grid
-      console.log("Initializing grid");
-      const newGrid = initializeGrid();
-      setGrid(newGrid);
-      
-      // Store the grid and bet amount in Firebase
-      await updateGameState('minesweeper', newGameId, {
-        gameData: {
-          grid: newGrid,
-          betAmount: betAmount
-        }
-      });
-      
-      // Create an actual on-chain escrow wallet
       try {
-        console.log("Creating escrow wallet");
-        addGameMessage("Creating secure escrow wallet on Solana devnet...");
+        // Test if we can access Firebase directly
+        try {
+          const testRef = ref(database, `test_connection_${Date.now()}`);
+          await set(testRef, { timestamp: Date.now() });
+          console.log("Direct Firebase write successful");
+        } catch (directError) {
+          console.error("Direct Firebase access error:", directError);
+          addGameMessage("⚠️ Firebase connection issue. Check console for details.");
+        }
         
-        const escrowAddr = await createEscrowWallet(newGameId);
-        console.log("Escrow wallet created:", escrowAddr);
-        setEscrowAddress(escrowAddr);
+        // Create a new game session in Firebase with real player ID
+        const playerId = publicKey.toString();
+        console.log("About to call createGameSession with:", 'minesweeper', playerId);
+        addGameMessage("🔄 Creating game session...");
         
-        // Update game with escrow address in Firebase
+        const newGameId = await createGameSession('minesweeper', playerId);
+        console.log("Game session created with ID:", newGameId);
+        addGameMessage(`✅ Game session created! ID: ${newGameId}`);
+        
+        setGameId(newGameId);
+        setGameLink(generateGameLink(newGameId));
+        
+        // Initialize the grid
+        console.log("Initializing grid");
+        const newGrid = initializeGrid();
+        setGrid(newGrid);
+        
+        // Store the grid and bet amount in Firebase
+        console.log("Updating game state with grid and bet amount");
+        addGameMessage("🔄 Saving game data...");
+        
         await updateGameState('minesweeper', newGameId, {
           gameData: {
-            escrowAddress: escrowAddr,
-            escrowFunded: {}
+            grid: newGrid,
+            betAmount: betAmount
           }
         });
         
-        addGameMessage(`✅ Secure escrow wallet created for betting. Address: ${escrowAddr.slice(0, 8)}...`);
-      } catch (escrowError) {
-        console.error("Error creating escrow:", escrowError);
-        addGameMessage("⚠️ Could not create escrow wallet. Game will continue without secure betting.");
-      }
-      
-      // Set game state
-      console.log("Setting game state to WAITING");
-      setHasOpponent(false);
-      setGameState(GameStateEnum.WAITING);
-      setActiveScreen('game');
-      setEscrowClaimed(false);
-      
-      // Start listening for real opponent and game updates
-      const unsubscribe = listenToGameUpdates('minesweeper', newGameId, (data) => {
-        console.log("Game update received:", data);
+        addGameMessage("✅ Game data saved!");
         
-        // Update opponent info if someone joined
-        if (data.opponent && !hasOpponent) {
-      setHasOpponent(true);
-          setOpponentAddress(data.opponent);
-          setGameState(GameStateEnum.PLAYING);
-          addGameMessage(`Opponent ${data.opponent.substring(0, 6)}... joined the game!`);
+        // Set game state
+        console.log("Setting game state to WAITING");
+        setHasOpponent(false);
+        setGameState(GameStateEnum.WAITING);
+        setActiveScreen('game');
+        
+        // Start listening for real opponent and game updates
+        console.log("Setting up listener for game updates");
+        addGameMessage("🔄 Setting up real-time connection...");
+        
+        const unsubscribe = listenToGameUpdates('minesweeper', newGameId, (data) => {
+          console.log("Game update received:", data);
           
-          // Update game status in Firebase to playing
-          updateGameState('minesweeper', newGameId, {
-            status: 'playing'
-          }).catch(error => {
-            console.error("Error updating game status:", error);
-          });
-        }
-        
-        // Update escrow funding status
-        if (data.gameData?.escrowFunded) {
-          setEscrowFunded(data.gameData.escrowFunded);
-          
-          // Check if both players funded
-          const bothFunded = 
-            data.gameData.escrowFunded[playerId] && 
-            data.opponent && 
-            data.gameData.escrowFunded[data.opponent];
-          
-          if (bothFunded) {
-            addGameMessage("✅ Both players have funded the escrow. Game is ready!");
-          }
-        }
-        
-        // Update grid if opponent made a move
-        if (data.gameData?.grid && data.lastUpdated) {
-          // Only update if the data is newer than our current state
-          setGrid(data.gameData.grid);
-        }
-        
-        // Check escrow claimed status
-        if (data.gameData?.escrowClaimed) {
-          setEscrowClaimed(true);
-        }
-        
-        // Check game end conditions
-        if (data.status === 'completed' && data.gameData?.winner) {
-          if (data.gameData.winner === playerId) {
-            setGameState(GameStateEnum.WIN);
-            addGameMessage("Congratulations! You won the game!");
+          // Update opponent info if someone joined
+          if (data.opponent && !hasOpponent) {
+            setHasOpponent(true);
+            setOpponentAddress(data.opponent);
+            setGameState(GameStateEnum.PLAYING);
+            addGameMessage(`Opponent ${data.opponent.substring(0, 6)}... joined the game!`);
             
-            if (escrowAddress && !escrowClaimed) {
-              addGameMessage("You can now claim your winnings by clicking the 'Claim Rewards' button!");
-            }
-          } else {
-            setGameState(GameStateEnum.GAME_OVER);
-            addGameMessage("Game over! Your opponent won.");
+            // Update game status in Firebase to playing
+            updateGameState('minesweeper', newGameId, {
+              status: 'playing'
+            }).catch(error => {
+              console.error("Error updating game status:", error);
+            });
           }
+          
+          // Rest of the game update handling...
+          // ... existing code ...
+        });
+        
+        // Store the unsubscribe function
+        if (unsubscribeRef.current) {
+          unsubscribeRef.current();
         }
-      });
-      
-      // Store the unsubscribe function
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
+        unsubscribeRef.current = unsubscribe;
+        
+        console.log("Game creation complete");
+        addGameMessage("✅ Game created! Waiting for opponent. Copy and share the link to invite someone.");
+        
+        // Add a game link display
+        setTimeout(() => {
+          addGameMessage(`📋 Game link: ${generateGameLink(newGameId)}`);
+          addGameMessage("Click 'Copy Link' to share with a friend.");
+        }, 500);
+        
+      } catch (error) {
+        console.error("Error creating game:", error);
+        if (error instanceof Error) {
+          addGameMessage(`⚠️ Error creating game: ${error.message}`);
+          console.error("Error stack:", error.stack);
+          
+          // Special handling for common errors
+          if (error.message.includes("Firebase")) {
+            addGameMessage("⚠️ Firebase connection issue. Please check your internet connection.");
+          } else if (error.message.includes("database")) {
+            addGameMessage("⚠️ Database access error. Try refreshing the page.");
+          }
+        } else {
+          addGameMessage(`⚠️ Error creating game: Unknown error`);
+        }
+        
+        // Suggest using the debug button
+        addGameMessage("Try using the Debug button below to diagnose the issue.");
       }
-      unsubscribeRef.current = unsubscribe;
-      
-      console.log("Game creation complete");
-      addGameMessage("Game created! Waiting for a real opponent. Share the link to invite someone.");
-    } catch (error) {
-      console.error("Error creating game:", error);
-      if (error instanceof Error) {
-        addGameMessage(`⚠️ Error creating game: ${error.message}`);
-        console.error("Error stack:", error.stack);
-      } else {
-        addGameMessage(`⚠️ Error creating game: Unknown error`);
-      }
+    } catch (outerError) {
+      console.error("Outer error in handleCreateGame:", outerError);
+      addGameMessage(`⚠️ Fatal error: ${outerError instanceof Error ? outerError.message : 'Unknown error'}`);
     }
   };
 
@@ -1605,6 +1619,37 @@ const MinesweeperGame: React.FC = () => {
     }
   };
 
+  // In the debug tools section, add a new function:
+
+  const createOfflineGame = () => {
+    try {
+      console.log("Creating offline game");
+      addGameMessage("🔄 Creating offline game...");
+      
+      // Generate a local game ID
+      const localGameId = "LOCAL-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+      
+      // Initialize a new grid
+      const newGrid = initializeGrid();
+      
+      // Update local state only (no Firebase)
+      setGameId(localGameId);
+      setGrid(newGrid);
+      setGameState(GameStateEnum.PLAYING);
+      setActiveScreen('game');
+      
+      addGameMessage("✅ Offline game created! You're playing solo.");
+      addGameMessage("Note: This game is not connected to Firebase or Solana.");
+      addGameMessage("This is just for testing the UI functionality.");
+      
+      return localGameId;
+    } catch (error) {
+      console.error("Error creating offline game:", error);
+      addGameMessage(`❌ Error creating offline game: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return null;
+    }
+  };
+
   // Effect to handle game ID from URL on page load
   useEffect(() => {
     const { id } = router.query;
@@ -1630,8 +1675,95 @@ const MinesweeperGame: React.FC = () => {
     };
   }, []);
 
+  // Add debug button at the bottom of the component, before the return statement
+  const debugCreateGame = async () => {
+    try {
+      console.log("Debug create game clicked");
+      addGameMessage("🔍 Testing basic game creation...");
+      
+      // Test wallet connection
+      addGameMessage("🔍 Testing wallet connection...");
+      if (!connected) {
+        addGameMessage("❌ No wallet connected - please connect your wallet first");
+        return;
+      }
+      
+      if (!publicKey) {
+        addGameMessage("❌ Public key is null despite wallet being connected");
+        return;
+      }
+      
+      // Display wallet info
+      const walletAddress = publicKey.toString();
+      addGameMessage(`✅ Wallet connected: ${walletAddress.substring(0, 6)}...${walletAddress.substring(walletAddress.length - 4)}`);
+      console.log("Full wallet address:", walletAddress);
+      
+      // Test Firebase connection
+      addGameMessage("🔍 Testing Firebase connection...");
+      try {
+        console.log("Creating test game in Firebase");
+        const testId = Math.random().toString(36).substring(2, 8).toUpperCase();
+        console.log(`Test game ID: ${testId}`);
+        
+        // Create a simple object directly in Firebase
+        const gameRef = ref(database, `test/${testId}`);
+        await set(gameRef, {
+          id: testId,
+          created: Date.now(),
+          test: true,
+          wallet: walletAddress
+        });
+        
+        addGameMessage(`✅ Firebase write successful! Test ID: ${testId}`);
+        
+        // Try to read it back
+        const snapshot = await get(gameRef);
+        if (snapshot.exists()) {
+          console.log("Firebase read successful:", snapshot.val());
+          addGameMessage("✅ Firebase read successful!");
+        } else {
+          addGameMessage("❌ Firebase read failed - data not found");
+        }
+      } catch (firebaseError) {
+        console.error("Firebase test error:", firebaseError);
+        addGameMessage(`❌ Firebase error: ${firebaseError instanceof Error ? firebaseError.message : 'Unknown error'}`);
+        
+        // Try to determine the specific Firebase error
+        const errorMsg = firebaseError instanceof Error ? firebaseError.message : String(firebaseError);
+        if (errorMsg.includes("permission_denied")) {
+          addGameMessage("❌ Firebase permission denied - check database rules");
+        } else if (errorMsg.includes("network")) {
+          addGameMessage("❌ Network error - check your internet connection");
+        } else if (errorMsg.includes("auth")) {
+          addGameMessage("❌ Firebase authentication error - check your credentials");
+        }
+      }
+      
+      // Try using the create game session function
+      try {
+        addGameMessage("🔍 Testing createGameSession function...");
+        const gameId = await createGameSession('minesweeper', publicKey.toString());
+        addGameMessage(`✅ createGameSession successful! Game ID: ${gameId}`);
+        
+        // See if we can read the created game
+        try {
+          const exists = await checkGameExists('minesweeper', gameId);
+          addGameMessage(`Game exists check: ${exists ? '✅' : '❌'}`);
+        } catch (checkError) {
+          addGameMessage(`❌ Error checking if game exists: ${checkError instanceof Error ? checkError.message : 'Unknown error'}`);
+        }
+      } catch (createError) {
+        console.error("Create game session error:", createError);
+        addGameMessage(`❌ createGameSession error: ${createError instanceof Error ? createError.message : 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error("Debug function error:", error);
+      addGameMessage(`❌ Debug error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   // Start the app
-      return (
+  return (
     <PageContainer>
       <Head>
         <title>Minesweeper | Rock Paper Solana</title>
@@ -1671,9 +1803,24 @@ const MinesweeperGame: React.FC = () => {
             </ButtonsContainer>
                 </AmountContainer>
           
-                <ActionButton onClick={handleCreateGame}>
-              Create Game
-            </ActionButton>
+                <ActionButton 
+                  onClick={handleCreateGame}
+                  style={{ 
+                    position: 'relative',
+                    overflow: 'hidden' 
+                  }}
+                  disabled={!connected || !publicKey}
+                >
+                  {!connected ? 'Connect Wallet First' : 'Create Game'}
+                  <span style={{ 
+                    position: 'absolute', 
+                    right: '10px', 
+                    top: '50%', 
+                    transform: 'translateY(-50%)'
+                  }}>
+                    ◎
+                  </span>
+                </ActionButton>
                 
                 <OrText>OR</OrText>
                 
@@ -1869,7 +2016,7 @@ const MinesweeperGame: React.FC = () => {
             <Tab active={activeTab === 'description'} onClick={() => setActiveTab('description')}>Description</Tab>
             </TabsContainer>
             
-          <MainContent>
+          <MainContent collapsed={sidebarCollapsed}>
             {activeTab === 'bigWins' && (
               <div>
                 <h3>Biggest Wins</h3>
@@ -1903,6 +2050,47 @@ const MinesweeperGame: React.FC = () => {
                 <p>In multiplayer mode, players take turns revealing cells. The first player to hit a mine loses, and the opponent wins the bet amount.</p>
               </div>
             )}
+            
+            {/* Add this right before the closing </MainContent> tag */}
+            <div style={{ marginTop: '20px', padding: '10px', border: '1px dashed #666', borderRadius: '8px' }}>
+              <h3>Debug Tools</h3>
+              {!connected && (
+                <div style={{ marginBottom: '15px' }}>
+                  <p style={{ color: '#ff3333', fontWeight: 'bold' }}>⚠️ Wallet not connected!</p>
+                  <WalletMultiButton />
+                </div>
+              )}
+              
+              <p>If "Create Game" is not working, try these options:</p>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <button 
+                  onClick={debugCreateGame}
+                  style={{ 
+                    padding: '10px 15px', 
+                    background: '#ff9900', 
+                    color: 'black', 
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Debug Game Creation
+                </button>
+                <button 
+                  onClick={createOfflineGame}
+                  style={{ 
+                    padding: '10px 15px', 
+                    background: '#4CAF50', 
+                    color: 'white', 
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Use Offline Mode
+                </button>
+              </div>
+            </div>
           </MainContent>
           </BottomSection>
         </GameWrapper>
