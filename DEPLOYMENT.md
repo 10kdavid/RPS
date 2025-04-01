@@ -1,83 +1,103 @@
-# Deploying Rock Paper Solana to Vercel
+# Rock Paper Solana Deployment Guide
 
-This guide will help you deploy the Rock Paper Solana app to Vercel, ensuring the Minesweeper game works correctly with multiplayer and Solana escrow integration.
+This guide covers the steps to successfully deploy the Rock Paper Solana game on Vercel.
 
-## Prerequisites
+## Pre-Deployment Checklist
 
-1. A [Vercel account](https://vercel.com/signup)
-2. A [Firebase project](https://console.firebase.google.com/) for multiplayer functionality
-3. Solana devnet SOL for testing (get from [Solana Faucet](https://faucet.solana.com/))
+1. **Environment Variables**: Make sure all required environment variables are set in Vercel:
 
-## Step 1: Prepare Your Environment Variables
+   ```
+   NEXT_IGNORE_TYPE_CHECK=true
+   NODE_ENV=production
+   NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyCb0BrVOWh5hV7NJ0dTwijFvNsCCBhYCyk
+   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=rock-paper-solana.firebaseapp.com
+   NEXT_PUBLIC_FIREBASE_DATABASE_URL=https://rock-paper-solana-default-rtdb.firebaseio.com
+   NEXT_PUBLIC_FIREBASE_PROJECT_ID=rock-paper-solana
+   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=rock-paper-solana.firebasestorage.app
+   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=1003950152721
+   NEXT_PUBLIC_FIREBASE_APP_ID=1:1003950152721:web:a44ac548ab1b662b0be5b0
+   NEXT_PUBLIC_SOLANA_RPC_URL=https://api.devnet.solana.com
+   NEXT_PUBLIC_ESCROW_PROGRAM_ID=cPmtN4KbNDNaVEuWWKczs7Va12KyDgJnYEhU8r2jfeG
+   ```
 
-1. Create a `.env` file based on the `.env.example` template
-2. Fill in your Firebase project details:
-   - Get these from your Firebase console under Project Settings
-   - Make sure Realtime Database is set up for multiplayer
-3. Use the Solana escrow program ID: `cPmtN4KbNDNaVEuWWKczs7Va12KyDgJnYEhU8r2jfeG`
+2. **Build Configuration**: The `vercel.json` file should specify the correct build command:
 
-## Step 2: Deploy to Vercel
+   ```json
+   {
+     "version": 2,
+     "buildCommand": "npm run vercel-build",
+     // other settings...
+   }
+   ```
 
-1. Push your project to GitHub
-2. Log in to Vercel and import your repository
-3. During setup, add these Environment Variables:
+3. **Content Security Policy**: Make sure the CSP headers in `vercel.json` include all required domains:
+   - Firebase domains (firebaseio.com, firebase.googleapis.com)
+   - Solana domains (solana.com, api.devnet.solana.com)
+
+## Troubleshooting Common Issues
+
+### Wallet Balance Not Displaying
+
+If the wallet balance is not showing:
+
+1. Check the browser console for connection errors with Solana RPC.
+2. Verify that `WalletContextProvider` is properly initialized in `_app.tsx`.
+3. Make sure you don't have conflicting wallet providers in the component tree.
+
+### Create Game Button Not Working
+
+If clicking "Create Game" doesn't create a new game:
+
+1. Verify Firebase connection in the browser console.
+2. Make sure your wallet is connected (the button should be disabled if not connected).
+3. Check for any errors in the Escrow service if using bets.
+
+### Firebase Connection Issues
+
+1. Make sure environment variables are properly set in Vercel dashboard.
+2. The Firebase project must be initialized with proper database rules.
+3. Realtime Database must be enabled in your Firebase project.
+
+## Testing Multiplayer Functionality
+
+To test multiplayer features:
+
+1. **Create a game**:
+   - Connect your wallet
+   - Click "Create Game" 
+   - A game ID/link should appear
+
+2. **Join from another browser**:
+   - Open the game link in another browser/incognito window
+   - Connect a different wallet
+   - You should be able to join and play
+
+## Vercel Analytics Integration
+
+Consider adding Vercel Analytics to track usage:
+
+1. Install the package:
+   ```
+   npm install @vercel/analytics
+   ```
+
+2. Import and add the component in `_app.tsx`:
+   ```jsx
+   import { Analytics } from '@vercel/analytics/react';
+
+   // Inside your app JSX
+   <>
+     {/* Your app components */}
+     <Analytics />
+   </>
+   ```
+
+## Final Deployment
+
+Run the following command to deploy to Vercel:
 
 ```
-NEXT_PUBLIC_SOLANA_RPC_URL=https://api.devnet.solana.com
-NEXT_PUBLIC_ESCROW_PROGRAM_ID=cPmtN4KbNDNaVEuWWKczs7Va12KyDgJnYEhU8r2jfeG
-NEXT_PUBLIC_FIREBASE_API_KEY=your-firebase-api-key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
-NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
-NEXT_PUBLIC_FIREBASE_DATABASE_URL=https://your-project-id-default-rtdb.firebaseio.com
+npm run deploy-to-vercel
 ```
 
-4. Deploy your project
-5. Note your Vercel URL (e.g., `your-project.vercel.app`)
-
-## Step 3: Test Game Sharing
-
-1. Connect your Phantom wallet to Solana devnet
-2. Create a game in the Minesweeper section
-3. Note the generated game link
-4. Share this link with a friend
-5. Your friend should be able to join your game
-
-## Step 4: Test Escrow Functionality
-
-1. Ensure you have Solana devnet SOL in your wallet
-2. Create a game with a bet amount
-3. Fund the escrow when prompted
-4. When your friend joins, they should see an option to fund their side
-5. Play the game and verify the winner can claim rewards
-
-## Troubleshooting
-
-If you encounter issues:
-
-1. **Friend can't join game**: Check Firebase rules to make sure read/write is allowed
-2. **Solana transactions failing**: Make sure you have devnet SOL and check browser console
-3. **Environment variables not working**: Check for typos and redeploy
-
-## Firebase Security Rules
-
-Make sure your Firebase Realtime Database has these rules:
-
-```json
-{
-  "rules": {
-    "games": {
-      ".read": true,
-      ".write": true
-    }
-  }
-}
-```
-
-## Note on Solana Escrow Contract
-
-The escrow contract is already deployed at address: `cPmtN4KbNDNaVEuWWKczs7Va12KyDgJnYEhU8r2jfeG`
-
-You don't need to deploy it again, just use this address in your environment variables. 
+Or push to GitHub and let Vercel auto-deploy if you have CI/CD set up. 

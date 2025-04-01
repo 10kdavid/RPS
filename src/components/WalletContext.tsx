@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
-import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
+import { ConnectionProvider, WalletProvider, useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
-import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
+import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { clusterApiUrl, Connection, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 // Default styles from Solana
@@ -22,19 +22,64 @@ const WalletStatusContext = createContext<WalletContextType>({
 
 export const useWalletStatus = () => useContext(WalletStatusContext);
 
+// Inner provider that has access to wallet hooks
+const InnerWalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { connection } = useConnection();
+  const { publicKey, connected } = useWallet();
+  const [balance, setBalance] = useState<number | null>(null);
+  const [isDevnet, setIsDevnet] = useState<boolean>(true);
+  
+  // Function to fetch wallet balance
+  const fetchBalance = async () => {
+    if (publicKey && connection) {
+      try {
+        console.log("Fetching wallet balance for", publicKey.toString());
+        const walletBalance = await connection.getBalance(publicKey);
+        const solBalance = walletBalance / LAMPORTS_PER_SOL;
+        console.log(`Wallet balance: ${solBalance} SOL (devnet)`);
+        setBalance(solBalance);
+      } catch (error) {
+        console.error('Error fetching balance:', error);
+      }
+    } else {
+      setBalance(null);
+    }
+  };
+  
+  // Fetch balance when wallet connects or changes
+  useEffect(() => {
+    if (connected && publicKey) {
+      fetchBalance();
+      
+      // Set up interval to refresh balance every 15 seconds
+      const intervalId = setInterval(fetchBalance, 15000);
+      
+      // Clean up interval when component unmounts
+      return () => clearInterval(intervalId);
+    } else {
+      setBalance(null);
+    }
+  }, [connected, publicKey, connection]);
+  
+  return (
+    <WalletStatusContext.Provider value={{ balance, network: 'devnet', isDevnet }}>
+      {children}
+    </WalletStatusContext.Provider>
+  );
+};
+
 export default function WalletContextProvider({ children }: { children: ReactNode }) {
   // Always use devnet for this application
   const network = WalletAdapterNetwork.Devnet;
   
-  // State for balance and network display
-  const [balance, setBalance] = useState<number | null>(null);
-  const [isDevnet, setIsDevnet] = useState<boolean>(true);
-  
   // Solana RPC endpoint - prefer the one from env vars, fallback to clusterApiUrl
   const endpoint = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || clusterApiUrl(network);
   
-  // For the wallet adapter
-  const wallets = [new PhantomWalletAdapter()];
+  // For the wallet adapter - add more wallet options
+  const wallets = [
+    new PhantomWalletAdapter(),
+    new SolflareWalletAdapter(),
+  ];
   
   // Log connection info on startup
   useEffect(() => {
@@ -42,10 +87,8 @@ export default function WalletContextProvider({ children }: { children: ReactNod
     
     // Simple check if we're on devnet
     if (endpoint.includes('devnet')) {
-      setIsDevnet(true);
       console.log('Confirmed running on devnet');
     } else {
-      setIsDevnet(false);
       console.warn('WARNING: Not running on devnet! This app is designed for devnet only.');
     }
   }, [endpoint, network]);
@@ -54,9 +97,9 @@ export default function WalletContextProvider({ children }: { children: ReactNod
     <ConnectionProvider endpoint={endpoint}>
       <WalletProvider wallets={wallets} autoConnect={true}>
         <WalletModalProvider>
-          <WalletStatusContext.Provider value={{ balance, network: 'devnet', isDevnet }}>
+          <InnerWalletProvider>
             {children}
-          </WalletStatusContext.Provider>
+          </InnerWalletProvider>
         </WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>

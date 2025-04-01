@@ -3,16 +3,21 @@ import { getDatabase, ref, set, onValue, off, get, connectDatabaseEmulator } fro
 
 console.log("Initializing Firebase...");
 
-// Firebase configuration
+// Use environment variables for Firebase config
 const firebaseConfig = {
-  apiKey: "AIzaSyA83tD8WrNWJYdQUycrmKXOG5HxhBl-VZA",
-  authDomain: "rock-paper-solana.firebaseapp.com",
-  databaseURL: "https://rock-paper-solana-default-rtdb.firebaseio.com",
-  projectId: "rock-paper-solana",
-  storageBucket: "rock-paper-solana.appspot.com",
-  messagingSenderId: "532741709354",
-  appId: "1:532741709354:web:07db0bf60e6f7c77bcf78e"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCb0BrVOWh5hV7NJ0dTwijFvNsCCBhYCyk",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "rock-paper-solana.firebaseapp.com",
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || "https://rock-paper-solana-default-rtdb.firebaseio.com",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "rock-paper-solana",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "rock-paper-solana.firebasestorage.app",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "1003950152721",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:1003950152721:web:a44ac548ab1b662b0be5b0"
 };
+
+console.log("Firebase config:", { 
+  apiKey: firebaseConfig.apiKey ? "Set" : "Not set",
+  dbUrl: firebaseConfig.databaseURL ? "Set" : "Not set"
+});
 
 let app;
 let database;
@@ -40,6 +45,10 @@ export interface GameState {
 // Create a new game session
 export const createGameSession = async (gameType: string, creatorId: string): Promise<string> => {
   try {
+    if (!database) {
+      throw new Error("Firebase database not initialized");
+    }
+    
     // Generate a unique game ID
     const gameId = Math.random().toString(36).substring(2, 10).toUpperCase();
     console.log(`Creating game session ${gameId} of type ${gameType} for creator ${creatorId}`);
@@ -64,6 +73,10 @@ export const createGameSession = async (gameType: string, creatorId: string): Pr
 // Join a game session
 export const joinGameSession = async (gameType: string, gameId: string, playerId: string): Promise<boolean> => {
   try {
+    if (!database) {
+      throw new Error("Firebase database not initialized");
+    }
+    
     console.log(`Joining game session ${gameId} of type ${gameType} for player ${playerId}`);
     
     // Check if game exists

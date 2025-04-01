@@ -2,7 +2,6 @@ import React from 'react';
 import type { AppProps } from 'next/app';
 import { ThemeProvider, createGlobalStyle } from 'styled-components';
 import Layout from '../components/Layout';
-import WalletProvider from '../contexts/WalletContext';
 import CrossmintWalletProvider from '../contexts/CrossmintWalletContext';
 import '../styles/globals.css';
 import WalletContextProvider from '../components/WalletContext';
@@ -57,11 +56,9 @@ function MyApp({ Component, pageProps }: AppProps) {
       <WalletContextProvider>
         <ThemeProvider theme={theme}>
           <CrossmintWalletProvider>
-            <WalletProvider>
-              <Layout>
-                <Component {...pageProps} />
-              </Layout>
-            </WalletProvider>
+            <Layout>
+              <Component {...pageProps} />
+            </Layout>
           </CrossmintWalletProvider>
         </ThemeProvider>
       </WalletContextProvider>

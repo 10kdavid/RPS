@@ -1,7 +1,1 @@
-{
-  "/_app": "pages/_app.js",
-  "/_error": "pages/_error.js",
-  "/_document": "pages/_document.js",
-  "/api/solana/rpc": "pages/api/solana/rpc.js",
-  "/api/solana/balance/[address]": "pages/api/solana/balance/[address].js"
-}
+{"/_app":"pages/_app.js","/_error":"pages/_error.js","/about":"pages/about.html","/404":"pages/404.html","/_document":"pages/_document.js","/api/crossmint/wallet":"pages/api/crossmint/wallet.js","/api/crossmint/balance/[address]":"pages/api/crossmint/balance/[address].js","/api/crossmint/escrow/release":"pages/api/crossmint/escrow/release.js","/api/crossmint/transactions/[address]":"pages/api/crossmint/transactions/[address].js","/api/proxy":"pages/api/proxy.js","/api/solana/balance/[address]":"pages/api/solana/balance/[address].js","/contact":"pages/contact.html","/api/solana/rpc":"pages/api/solana/rpc.js","/game/blackjack":"pages/game/blackjack.html","/game/rock-paper-scissors":"pages/game/rock-paper-scissors.html","/":"pages/index.html","/games":"pages/games.html","/help":"pages/help.html","/game/minesweeper":"pages/game/minesweeper.html","/settings":"pages/settings.html","/wallet":"pages/wallet.html"}
